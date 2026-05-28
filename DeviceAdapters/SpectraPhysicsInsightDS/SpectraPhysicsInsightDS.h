@@ -29,12 +29,6 @@
 #define ERR_WATCHDOG_CHANGE_FORBIDDEN    10002
 #define ERR_PUMP_LASER_NOT_WARM 10003
 
-enum LastCommand {
-    PUMP_LASER_ON = 1,
-    PUMP_LASER_OFF = 2,
-
-};
-
 class SpectraPhysicsInsightDS : public CShutterBase<SpectraPhysicsInsightDS>
 {
     friend class WatchdogThread;

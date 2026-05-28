@@ -102,20 +102,9 @@ int SpectraPhysicsInsightDS::Initialize()
         return DEVICE_NOT_CONNECTED;
     }
 
-    if (watchdogDisabled_) {
-        // Disable watchdog by setting timeout to 0 seconds
-		ret = ExecuteCommand("TIM:WATC 0");
-		if (ret != 0)
-			return ret;
-    }
-    else {
-		// Setup watchdog timer to 3 seconds (timeout recommended by manual)
-		ret = ExecuteCommand("TIM:WATC 3");
-		if (ret != 0)
-			return ret;
-        // Then start the watchdog thread
-        watchdogThread_->Start();
-    }
+	ret = ExecuteCommand(watchdogDisabled_ ? "TIM:WATC 0" : "TIM:WATC 3");
+	if (ret != 0)
+		return ret;
 
 
     // Configure wavelength property
@@ -191,6 +180,11 @@ int SpectraPhysicsInsightDS::Initialize()
 
 
     initialized_ = true;
+
+	// Start the watchdog thread. We do it here so Shutdown cleans it up.
+    if (!watchdogDisabled_)
+        watchdogThread_->Start();
+
     return DEVICE_OK;
 }
 
@@ -217,24 +211,28 @@ bool SpectraPhysicsInsightDS::Busy()
         int state{};
         int ret = LaserState(state);
         if (ret != 0)
-            return ret;
-        return state == 50;
-       
-        //std::chrono::duration elapsed = std::chrono::steady_clock::now() - lastCommandTime_;
-        //if (elapsed < std::chrono::seconds(1)) {
-        //    return true;
-        //}
+            return false;
+        return state != 50;
     }
     else if (lastCommand_.rfind("WAV ", 0) == 0) {
         int state{};
         int ret = LaserState(state);
         if (ret != 0)
-            return ret;
-        return state == 25;
+            return false;
+        return state != 25;
     }
-    else if (lastCommand_ == "OFF")
+    else if (lastCommand_ == "SHUT 1")
     {
-        
+        std::chrono::duration elapsed = std::chrono::steady_clock::now() - lastCommandTime_;
+        return elapsed < std::chrono::seconds(1);
+    }
+    else if (lastCommand_ == "SHUT 0")
+    {
+        bool stillOpen;
+        int ret = StatusBit(2, stillOpen);
+        if (ret != 0)
+            return false;
+        return stillOpen;
     }
     return false;
 }
@@ -503,10 +501,6 @@ int SpectraPhysicsInsightDS::SendCommand(const std::string& cmd)
 int SpectraPhysicsInsightDS::StatusBit(unsigned int bitNumber, bool& bit)
 {
     // Returns an integer value that corresponds to a 32-bit binary number
-    //
-    // TODO It is apparently normal for this command to return an incorrect status for
-    // 1 second after SetOpen(true)
-    //
     // TODO We could be misinterpreting the return of the command - ReadFromComPort could be more appropriate
     std::string status_int;
     int ret = ExecuteCommand("*STB?", status_int);
@@ -541,7 +535,6 @@ WatchdogThread::WatchdogThread(SpectraPhysicsInsightDS& device) :
 
 WatchdogThread::~WatchdogThread() {
     Stop();
-    wait();
 }
 
 void WatchdogThread::Start()
@@ -550,6 +543,10 @@ void WatchdogThread::Start()
     activate();
 }
 
+/*
+ * This function tells the thread to cease sending keepalive commands
+ * and blocks until the last keepalive command has been sent.
+ */
 void WatchdogThread::Stop()
 {
     {
@@ -557,18 +554,29 @@ void WatchdogThread::Stop()
         stop_ = true;
     }
     timerCV_.notify_all();
+    wait();
 }
 
 int WatchdogThread::svc() {
     while (!stop_)
     {
-		std::unique_lock<std::mutex> lock(stopMutex_);
-        timerCV_.wait_for(lock, interval_, [this] {return stop_;  });
-        if (stop_)
-            break;
+        {
+            std::unique_lock<std::mutex> lock(stopMutex_);
+            // This call blocks until:
+            // (1) stop_ is true (Stop() sets this and notifies the CV to wake us early)
+            // (2) The duration interval_ elapses
+            // The predicate handles spurious wakeups by re-sleeping if stop_ is still false.
+            timerCV_.wait_for(lock, interval_, [this] { return stop_; });
+            if (stop_)
+            {
+                device_.LogMessage("Spectra Insight Watchdog Thread: Stop requested, exiting", true);
+                break;
+            }
+        }
         // Just need to do something that sends a command
         int state;
         device_.LaserState(state);
+        device_.LogMessage("Spectra Insight Watchdog Thread: Pinging laser", true);
 
     }
 
