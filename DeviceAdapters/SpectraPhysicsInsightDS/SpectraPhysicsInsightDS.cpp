@@ -20,7 +20,7 @@
 #include <chrono>
 #include <cstring>
 
-const char* g_DeviceName = "Spectra-Physics Insight DS+";
+const char* g_DeviceName = "SpectraPhysicsInsightDS+";
 const char* g_On = "On";
 const char* g_Off = "Off";
 const char* g_Yes = "Yes";
@@ -28,7 +28,7 @@ const char* g_No = "No";
 
 MODULE_API void InitializeModuleData()
 {
-    RegisterDevice(g_DeviceName, MM::ShutterDevice, "TODO");
+    RegisterDevice(g_DeviceName, MM::ShutterDevice, "Spectra-Physics InSight DS+ Laser System");
 }
 
 MODULE_API MM::Device* CreateDevice(const char* deviceName)
@@ -487,6 +487,7 @@ int SpectraPhysicsInsightDS::ExecuteCommand(const std::string& cmd)
 int SpectraPhysicsInsightDS::SendCommand(const std::string& cmd)
 {
 	// Send command
+	LogMessage("Spectra Insight: Sending command " + cmd, true);
     int ret = SendSerialCommand(port_.c_str(), cmd.c_str(), "\r");
     if (ret != 0)
         return ret;
