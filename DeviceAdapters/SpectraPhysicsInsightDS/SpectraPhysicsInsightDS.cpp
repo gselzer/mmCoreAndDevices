@@ -59,6 +59,9 @@ SpectraPhysicsInsightDS::SpectraPhysicsInsightDS() :
     SetErrorText(ERR_PORT_CHANGE_FORBIDDEN, "Cannot change port after initialization");
     // This is really more of a shouldn't than a can't...
     SetErrorText(ERR_WATCHDOG_CHANGE_FORBIDDEN, "Cannot toggle watchdog timer after initialization");
+    SetErrorText(ERR_PUMP_LASER_NOT_WARM, "Cannot turn on the pump laser before it's warmed up");
+    SetErrorText(ERR_WAVELENGTH_CHANGING, "Cannot turn on the pump laser before the wavelength is stable");
+    SetErrorText(ERR_PUMP_LASER_TURNING_ON, "Cannot open the shutter before the laser is on");
 
     // COM port property
 	CPropertyAction* pActPort = new CPropertyAction (this, &SpectraPhysicsInsightDS::OnPort);
@@ -237,8 +240,13 @@ bool SpectraPhysicsInsightDS::Busy()
 
 int SpectraPhysicsInsightDS::SetOpen(bool open)
 {
-    if (open)
+    if (open) {
+        int ret{}, state{};
+		ret = LaserState(state);
+		if (ret != 50)
+			return ERR_PUMP_LASER_TURNING_ON;
         return ExecuteCommand("SHUT 1");
+    }
     else
         return ExecuteCommand("SHUT 0");
 }
@@ -311,9 +319,6 @@ int SpectraPhysicsInsightDS::OnWavelength(MM::PropertyBase * pProp, MM::ActionTy
         std::string cmd;
         pProp->Get(cmd);
         cmd = "WAV " + cmd;
-        // TODO Consider the WAV? command for reading the result?
-        // TODO Busy should return True() until READ:WAV? is the same as what we just set here
-        // Consider also checking the STB command state bits for the READY value (25)
         return ExecuteCommand(cmd);
 	}
 
@@ -436,7 +441,10 @@ int SpectraPhysicsInsightDS::OnPumpLaser(MM::PropertyBase * pProp, MM::ActionTyp
 				return ret;
 			if (stoi(warmupPct) < 100)
 				return ERR_PUMP_LASER_NOT_WARM;
-			// TODO Consider also checking the STB command state bits for the RUN value (50)
+            int state{};
+            ret = LaserState(state);
+            if (ret != 25)
+                return ERR_WAVELENGTH_CHANGING;
             return ExecuteCommand("ON");
 		}
         else
@@ -492,7 +500,6 @@ int SpectraPhysicsInsightDS::SendCommand(const std::string& cmd)
 int SpectraPhysicsInsightDS::StatusBit(unsigned int bitNumber, bool& bit)
 {
     // Returns an integer value that corresponds to a 32-bit binary number
-    // TODO We could be misinterpreting the return of the command - ReadFromComPort could be more appropriate
     std::string status_int;
     int ret = ExecuteCommand("*STB?", status_int);
     if (ret != 0)
