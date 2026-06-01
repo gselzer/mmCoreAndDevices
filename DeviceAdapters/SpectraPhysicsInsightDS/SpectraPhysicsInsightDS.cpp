@@ -20,7 +20,9 @@
 #include <chrono>
 #include <cstring>
 
-const char* g_DeviceName = "SpectraPhysicsInsightDS+";
+const char* g_DeviceNameHub = "SpectraPhysicsInsightDS+";
+const char* g_DeviceNameMain = "SpectraPhysicsInsightDS+ Main Shutter";
+const char* g_DeviceName1040 = "SpectraPhysicsInsightDS+ 1040nm Shutter";
 const char* g_On = "On";
 const char* g_Off = "Off";
 const char* g_Yes = "Yes";
@@ -28,7 +30,9 @@ const char* g_No = "No";
 
 MODULE_API void InitializeModuleData()
 {
-    RegisterDevice(g_DeviceName, MM::ShutterDevice, "Spectra-Physics InSight DS+ Laser System");
+    RegisterDevice(g_DeviceNameHub, MM::HubDevice, "Spectra-Physics InSight DS+ Laser System");
+    RegisterDevice(g_DeviceNameMain, MM::ShutterDevice, "Spectra-Physics InSight DS+ Laser System Main Shutter");
+    RegisterDevice(g_DeviceName1040, MM::ShutterDevice, "Spectra-Physics InSight DS+ Laser System 1040nm Shutter");
 }
 
 MODULE_API MM::Device* CreateDevice(const char* deviceName)
@@ -36,9 +40,19 @@ MODULE_API MM::Device* CreateDevice(const char* deviceName)
     if (deviceName == 0)
         return 0;
 
-    if (std::strcmp(deviceName, g_DeviceName) == 0)
+    if (std::strcmp(deviceName, g_DeviceNameHub) == 0)
     {
         return new SpectraPhysicsInsightDS();
+    }
+
+    if (std::strcmp(deviceName, g_DeviceNameMain) == 0)
+    {
+        return new SpectraPhysicsInsightDSMain();
+    }
+
+    if (std::strcmp(deviceName, g_DeviceName1040) == 0)
+    {
+        return new SpectraPhysicsInsightDS1040();
     }
     return 0;
 }
@@ -47,6 +61,10 @@ MODULE_API void DeleteDevice(MM::Device* pDevice)
 {
     delete pDevice;
 }
+
+////////////////////////////////////////////////////////////////////////////////////
+// HUB DEVICE
+////////////////////////////////////////////////////////////////////////////////////
 
 // Implementation of MyNewDevice methods
 SpectraPhysicsInsightDS::SpectraPhysicsInsightDS() :
@@ -62,6 +80,7 @@ SpectraPhysicsInsightDS::SpectraPhysicsInsightDS() :
     SetErrorText(ERR_PUMP_LASER_NOT_WARM, "Cannot turn on the pump laser before it's warmed up");
     SetErrorText(ERR_WAVELENGTH_CHANGING, "Cannot turn on the pump laser before the wavelength is stable");
     SetErrorText(ERR_PUMP_LASER_TURNING_ON, "Cannot open the shutter before the laser is on");
+    SetErrorText(ERR_NO_HUB, "Cannot obtain the SpectraPhysicsInsightDS MMCore Hub device");
 
     // COM port property
 	CPropertyAction* pActPort = new CPropertyAction (this, &SpectraPhysicsInsightDS::OnPort);
@@ -82,7 +101,7 @@ SpectraPhysicsInsightDS::~SpectraPhysicsInsightDS()
 
 void SpectraPhysicsInsightDS::GetName(char* name) const
 {
-    CDeviceUtils::CopyLimitedString(name, g_DeviceName);
+    CDeviceUtils::CopyLimitedString(name, g_DeviceNameHub);
 }
 
 int SpectraPhysicsInsightDS::Initialize()
@@ -109,77 +128,6 @@ int SpectraPhysicsInsightDS::Initialize()
 		return ret;
 
 
-    // Configure wavelength property
-    std::string wave_min{}, wave_max{};
-    ret = ExecuteCommand("WAV:min?", wave_min);
-    if (ret != 0)
-        return ret;
-    ret = ExecuteCommand("WAV:max?", wave_max);
-    if (ret != 0)
-        return ret;
-	CPropertyAction* pActWavelength = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnWavelength);
-    ret = CreateIntegerProperty("Wavelength", 800, false, pActWavelength);
-    if (ret != 0)
-        return ret;
-    ret = SetPropertyLimits("Wavelength", stoi(wave_min), stoi(wave_max));
-    if (ret != 0)
-        return ret;
-
-    // Configure pump laser property
-	CPropertyAction* pActPumpLaser = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnPumpLaser);
-    ret = CreateStringProperty("Pump Laser", g_Off, false, pActPumpLaser);
-    if (ret != 0)
-        return ret;
-    ret = AddAllowedValue("Pump Laser", g_Off);
-    if (ret != 0)
-        return ret;
-    ret = AddAllowedValue("Pump Laser", g_On);
-    if (ret != 0)
-        return ret;
-
-    // Configure humidity property (read-only)
-	CPropertyAction* pActHumidity = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnHumidity);
-    ret = CreateIntegerProperty("RelativeHumidity", 0, true, pActHumidity);
-    if (ret != 0)
-        return ret;
-
-    // Configure warmup percentage property (read-only)
-	CPropertyAction* pActWarmup = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnWarmup);
-    ret = CreateIntegerProperty("Warmup Percentage", 0, true, pActWarmup);
-    if (ret != 0)
-        return ret;
-
-    // Configure diode1 current property (read-only)
-	CPropertyAction* pActDiode1Current = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnDiode1Current);
-    ret = CreateFloatProperty("Diode 1 Current", 0, true, pActDiode1Current);
-    if (ret != 0)
-        return ret;
-
-    // Configure diode2 current property (read-only)
-	CPropertyAction* pActDiode2Current = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnDiode2Current);
-    ret = CreateFloatProperty("Diode 2 Current", 0, true, pActDiode2Current);
-    if (ret != 0)
-        return ret;
-
-    // Configure diode1 temperature property (read-only)
-	CPropertyAction* pActDiode1Temp = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnDiode1Temp);
-    ret = CreateFloatProperty("Diode 1 Temperature (Celsius)", 0, true, pActDiode1Temp);
-    if (ret != 0)
-        return ret;
-
-    // Configure diode2 temperature property (read-only)
-	CPropertyAction* pActDiode2Temp = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnDiode2Temp);
-    ret = CreateFloatProperty("Diode 2 Temperature (Celsius)", 0, true, pActDiode2Temp);
-    if (ret != 0)
-        return ret;
-
-    // Configure output power property (read-only)
-	CPropertyAction* pActPower = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnPower);
-    ret = CreateFloatProperty("Laser Power (Watts)", 0, true, pActPower);
-    if (ret != 0)
-        return ret;
-
-
     initialized_ = true;
 
 	// Start the watchdog thread. We do it here so Shutdown cleans it up.
@@ -193,7 +141,6 @@ int SpectraPhysicsInsightDS::Shutdown()
 {
     if (initialized_)
     {
-        SetOpen(false);
         if (watchdogThread_)
         {
             watchdogThread_->Stop();
@@ -238,28 +185,15 @@ bool SpectraPhysicsInsightDS::Busy()
     return false;
 }
 
-int SpectraPhysicsInsightDS::SetOpen(bool open)
+int SpectraPhysicsInsightDS::DetectInstalledDevices()
 {
-    if (open) {
-        int ret{}, state{};
-		ret = LaserState(state);
-		if (ret != 50)
-			return ERR_PUMP_LASER_TURNING_ON;
-        return ExecuteCommand("SHUT 1");
-    }
-    else
-        return ExecuteCommand("SHUT 0");
-}
-
-int SpectraPhysicsInsightDS::GetOpen(bool& open)
-{
-    // Bit 2 identifies the main shutter, 1 means it is open
-    return StatusBit(2, open);
-}
-
-int SpectraPhysicsInsightDS::Fire(double deltaT)
-{
-   return DEVICE_UNSUPPORTED_COMMAND;
+    MM::Device *laser = CreateDevice(g_DeviceNameMain);
+    if (laser)
+        AddInstalledDevice(laser);
+    MM::Device *laser1040 = CreateDevice(g_DeviceName1040);
+    if (laser1040)
+        AddInstalledDevice(laser1040);
+    return DEVICE_OK;
 }
 
 int SpectraPhysicsInsightDS::OnPort(MM::PropertyBase * pProp, MM::ActionType eAct)
@@ -304,12 +238,12 @@ int SpectraPhysicsInsightDS::OnWatchdog(MM::PropertyBase * pProp, MM::ActionType
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsightDS::OnWavelength(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsInsightDSMain::OnWavelength(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
         std::string wavelength;
-        int ret = ExecuteCommand("READ:WAV?", wavelength);
+        int ret = parent_->ExecuteCommand("READ:WAV?", wavelength);
         if (ret != 0)
             return ret;
 		pProp->Set(wavelength.c_str());
@@ -319,18 +253,18 @@ int SpectraPhysicsInsightDS::OnWavelength(MM::PropertyBase * pProp, MM::ActionTy
         std::string cmd;
         pProp->Get(cmd);
         cmd = "WAV " + cmd;
-        return ExecuteCommand(cmd);
+        return parent_->ExecuteCommand(cmd);
 	}
 
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsightDS::OnWarmup(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsInsightDSMain::OnWarmup(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
         std::string warmupPct;
-        int ret = ExecuteCommand("READ:PCTW?", warmupPct);
+        int ret = parent_->ExecuteCommand("READ:PCTW?", warmupPct);
         if (ret != 0)
             return ret;
 		pProp->Set(warmupPct.c_str());
@@ -338,12 +272,12 @@ int SpectraPhysicsInsightDS::OnWarmup(MM::PropertyBase * pProp, MM::ActionType e
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsightDS::OnHumidity(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsInsightDSMain::OnHumidity(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
         std::string humidityPct;
-        int ret = ExecuteCommand("READ:HUM?", humidityPct);
+        int ret = parent_->ExecuteCommand("READ:HUM?", humidityPct);
         if (ret != 0)
             return ret;
 		pProp->Set(humidityPct.c_str());
@@ -351,12 +285,12 @@ int SpectraPhysicsInsightDS::OnHumidity(MM::PropertyBase * pProp, MM::ActionType
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsightDS::OnDiode1Current(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsInsightDSMain::OnDiode1Current(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
         std::string diode1Current;
-        int ret = ExecuteCommand("READ:PLAS:DIOD1:CURR?", diode1Current);
+        int ret = parent_->ExecuteCommand("READ:PLAS:DIOD1:CURR?", diode1Current);
         if (ret != 0)
             return ret;
 		pProp->Set(diode1Current.c_str());
@@ -364,12 +298,12 @@ int SpectraPhysicsInsightDS::OnDiode1Current(MM::PropertyBase * pProp, MM::Actio
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsightDS::OnDiode2Current(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsInsightDSMain::OnDiode2Current(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
         std::string diode2Current;
-        int ret = ExecuteCommand("READ:PLAS:DIOD2:CURR?", diode2Current);
+        int ret = parent_->ExecuteCommand("READ:PLAS:DIOD2:CURR?", diode2Current);
         if (ret != 0)
             return ret;
 		pProp->Set(diode2Current.c_str());
@@ -377,12 +311,12 @@ int SpectraPhysicsInsightDS::OnDiode2Current(MM::PropertyBase * pProp, MM::Actio
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsightDS::OnDiode1Temp(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsInsightDSMain::OnDiode1Temp(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
         std::string diode1Temperature;
-        int ret = ExecuteCommand("READ:PLAS:DIOD1:TEMP?", diode1Temperature);
+        int ret = parent_->ExecuteCommand("READ:PLAS:DIOD1:TEMP?", diode1Temperature);
         if (ret != 0)
             return ret;
 		pProp->Set(diode1Temperature.c_str());
@@ -390,12 +324,12 @@ int SpectraPhysicsInsightDS::OnDiode1Temp(MM::PropertyBase * pProp, MM::ActionTy
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsightDS::OnDiode2Temp(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsInsightDSMain::OnDiode2Temp(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
         std::string diode2Temperature;
-        int ret = ExecuteCommand("READ:PLAS:DIOD2:TEMP?", diode2Temperature);
+        int ret = parent_->ExecuteCommand("READ:PLAS:DIOD2:TEMP?", diode2Temperature);
         if (ret != 0)
             return ret;
 		pProp->Set(diode2Temperature.c_str());
@@ -403,12 +337,12 @@ int SpectraPhysicsInsightDS::OnDiode2Temp(MM::PropertyBase * pProp, MM::ActionTy
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsightDS::OnPower(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsInsightDSMain::OnPower(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
         std::string power;
-        int ret = ExecuteCommand("READ:POW?", power);
+        int ret = parent_->ExecuteCommand("READ:POW?", power);
         if (ret != 0)
             return ret;
 		pProp->Set(power.c_str());
@@ -417,13 +351,13 @@ int SpectraPhysicsInsightDS::OnPower(MM::PropertyBase * pProp, MM::ActionType eA
 }
 
 
-int SpectraPhysicsInsightDS::OnPumpLaser(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsInsightDSMain::OnPumpLaser(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
 		// Bit 0 identifies energized state, 1 means energized
         bool isEnergized;
-		int ret = StatusBit(0, isEnergized);
+		int ret = parent_->StatusBit(0, isEnergized);
         if (ret != 0)
             return ret;
         pProp->Set(isEnergized ? g_On : g_Off);
@@ -436,20 +370,20 @@ int SpectraPhysicsInsightDS::OnPumpLaser(MM::PropertyBase * pProp, MM::ActionTyp
         {
             std::string warmupPct{};
             int ret{};
-			ret = ExecuteCommand("READ:PCTW?", warmupPct);
+			ret = parent_->ExecuteCommand("READ:PCTW?", warmupPct);
 			if (ret != 0)
 				return ret;
 			if (stoi(warmupPct) < 100)
 				return ERR_PUMP_LASER_NOT_WARM;
             int state{};
-            ret = LaserState(state);
+            ret = parent_->LaserState(state);
             if (ret != 25)
                 return ERR_WAVELENGTH_CHANGING;
-            return ExecuteCommand("ON");
+            return parent_->ExecuteCommand("ON");
 		}
         else
         {
-            return ExecuteCommand("OFF");
+            return parent_->ExecuteCommand("OFF");
         }
 	}
 
@@ -523,6 +457,224 @@ int SpectraPhysicsInsightDS::LaserState(int& state)
     state = (status_byte & bit_mask) >> 16;
     return DEVICE_OK;
 }
+
+////////////////////////////////////////////////////////////////////////////////////
+// MAIN SHUTTER
+////////////////////////////////////////////////////////////////////////////////////
+
+SpectraPhysicsInsightDSMain::SpectraPhysicsInsightDSMain() :
+    initialized_(false),
+	parent_(nullptr)
+{
+}
+
+SpectraPhysicsInsightDSMain::~SpectraPhysicsInsightDSMain()
+{
+    Shutdown();
+}
+
+int SpectraPhysicsInsightDSMain::Initialize() {
+    MM::Hub* hub = GetParentHub();
+    if (!hub)
+        return ERR_NO_HUB;
+    parent_ = dynamic_cast<SpectraPhysicsInsightDS*>(GetParentHub());
+
+    // Configure wavelength property
+    std::string wave_min{}, wave_max{};
+    int ret{};
+    ret = parent_->ExecuteCommand("WAV:min?", wave_min);
+    if (ret != 0)
+        return ret;
+    ret = parent_->ExecuteCommand("WAV:max?", wave_max);
+    if (ret != 0)
+        return ret;
+	CPropertyAction* pActWavelength = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnWavelength);
+    ret = CreateIntegerProperty("Wavelength", 800, false, pActWavelength);
+    if (ret != 0)
+        return ret;
+    ret = SetPropertyLimits("Wavelength", stoi(wave_min), stoi(wave_max));
+    if (ret != 0)
+        return ret;
+
+    // Configure pump laser property
+	CPropertyAction* pActPumpLaser = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnPumpLaser);
+    ret = CreateStringProperty("Pump Laser", g_Off, false, pActPumpLaser);
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("Pump Laser", g_Off);
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("Pump Laser", g_On);
+    if (ret != 0)
+        return ret;
+
+    // Configure humidity property (read-only)
+	CPropertyAction* pActHumidity = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnHumidity);
+    ret = CreateIntegerProperty("RelativeHumidity", 0, true, pActHumidity);
+    if (ret != 0)
+        return ret;
+
+    // Configure warmup percentage property (read-only)
+	CPropertyAction* pActWarmup = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnWarmup);
+    ret = CreateIntegerProperty("Warmup Percentage", 0, true, pActWarmup);
+    if (ret != 0)
+        return ret;
+
+    // Configure diode1 current property (read-only)
+	CPropertyAction* pActDiode1Current = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnDiode1Current);
+    ret = CreateFloatProperty("Diode 1 Current", 0, true, pActDiode1Current);
+    if (ret != 0)
+        return ret;
+
+    // Configure diode2 current property (read-only)
+	CPropertyAction* pActDiode2Current = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnDiode2Current);
+    ret = CreateFloatProperty("Diode 2 Current", 0, true, pActDiode2Current);
+    if (ret != 0)
+        return ret;
+
+    // Configure diode1 temperature property (read-only)
+	CPropertyAction* pActDiode1Temp = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnDiode1Temp);
+    ret = CreateFloatProperty("Diode 1 Temperature (Celsius)", 0, true, pActDiode1Temp);
+    if (ret != 0)
+        return ret;
+
+    // Configure diode2 temperature property (read-only)
+	CPropertyAction* pActDiode2Temp = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnDiode2Temp);
+    ret = CreateFloatProperty("Diode 2 Temperature (Celsius)", 0, true, pActDiode2Temp);
+    if (ret != 0)
+        return ret;
+
+    // Configure output power property (read-only)
+	CPropertyAction* pActPower = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnPower);
+    ret = CreateFloatProperty("Laser Power (Watts)", 0, true, pActPower);
+    if (ret != 0)
+        return ret;
+
+
+
+    initialized_ = true;
+    return DEVICE_OK;
+}
+
+int SpectraPhysicsInsightDSMain::Shutdown()
+{
+    if (initialized_)
+    {
+        SetOpen(false);
+        initialized_ = false;
+    }
+    return DEVICE_OK;
+}
+
+void SpectraPhysicsInsightDSMain::GetName(char* name) const
+{
+    CDeviceUtils::CopyLimitedString(name, g_DeviceNameMain);
+}
+
+bool SpectraPhysicsInsightDSMain::Busy()
+{
+    // TODO: We could probably be more granular about this.
+    return parent_->Busy();
+}
+
+
+int SpectraPhysicsInsightDSMain::SetOpen(bool open)
+{
+    if (open) {
+        int ret{}, state{};
+		ret = parent_->LaserState(state);
+		if (ret != 50)
+			return ERR_PUMP_LASER_TURNING_ON;
+        return parent_->ExecuteCommand("SHUT 1");
+    }
+    else
+        return parent_->ExecuteCommand("SHUT 0");
+}
+
+int SpectraPhysicsInsightDSMain::GetOpen(bool& open)
+{
+    // Bit 2 identifies the main shutter, 1 means it is open
+    return parent_->StatusBit(2, open);
+}
+
+int SpectraPhysicsInsightDSMain::Fire(double deltaT)
+{
+   return DEVICE_UNSUPPORTED_COMMAND;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////
+// 1040nm SHUTTER
+////////////////////////////////////////////////////////////////////////////////////
+
+SpectraPhysicsInsightDS1040::SpectraPhysicsInsightDS1040() :
+    initialized_(false),
+	parent_(nullptr)
+{
+}
+
+SpectraPhysicsInsightDS1040::~SpectraPhysicsInsightDS1040()
+{
+    Shutdown();
+}
+
+int SpectraPhysicsInsightDS1040::Initialize() {
+    MM::Hub* hub = GetParentHub();
+    if (!hub)
+        return ERR_NO_HUB;
+    parent_ = dynamic_cast<SpectraPhysicsInsightDS*>(GetParentHub());
+	initialized_ = true;
+    return DEVICE_OK;
+}
+
+int SpectraPhysicsInsightDS1040::Shutdown()
+{
+    if (initialized_)
+    {
+        SetOpen(false);
+        initialized_ = false;
+    }
+    return DEVICE_OK;
+}
+
+void SpectraPhysicsInsightDS1040::GetName(char* name) const
+{
+    CDeviceUtils::CopyLimitedString(name, g_DeviceName1040);
+}
+
+bool SpectraPhysicsInsightDS1040::Busy()
+{
+    // TODO: We could probably be more granular about this.
+    return parent_->Busy();
+}
+
+int SpectraPhysicsInsightDS1040::SetOpen(bool open)
+{
+    if (open) {
+        int ret{}, state{};
+		ret = parent_->LaserState(state);
+		if (ret != 50)
+			return ERR_PUMP_LASER_TURNING_ON;
+        return parent_->ExecuteCommand("IRSHUT 1");
+    }
+    else
+        return parent_->ExecuteCommand("IRSHUT 0");
+}
+
+int SpectraPhysicsInsightDS1040::GetOpen(bool& open)
+{
+    // Bit 3 identifies the IR shutter, 1 means it is open
+    return parent_->StatusBit(3, open);
+}
+
+int SpectraPhysicsInsightDS1040::Fire(double deltaT)
+{
+    return DEVICE_UNSUPPORTED_COMMAND;
+}
+
+////////////////////////////////////////////////////////////////////////////////////
+// WATCHDOG THREAD
+////////////////////////////////////////////////////////////////////////////////////
 
 WatchdogThread::WatchdogThread(SpectraPhysicsInsightDS& device) :
     device_(device),
