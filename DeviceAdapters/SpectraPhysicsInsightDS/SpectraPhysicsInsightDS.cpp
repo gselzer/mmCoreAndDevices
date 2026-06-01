@@ -123,7 +123,6 @@ int SpectraPhysicsInsightDS::Initialize()
         return ret;
 
     // Configure pump laser property
-    // TODO Should this be a property? What happens when you set it to OFF? Maybe ask Jenu
 	CPropertyAction* pActPumpLaser = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnPumpLaser);
     ret = CreateStringProperty("Pump Laser", g_Off, false, pActPumpLaser);
     if (ret != 0)
@@ -238,9 +237,6 @@ bool SpectraPhysicsInsightDS::Busy()
 
 int SpectraPhysicsInsightDS::SetOpen(bool open)
 {
-    // TODO: Record the last sent command and last sent time. If the last sent command is open,
-    // then Busy() needs to return true for 1 second. If the last sent command is close, then
-    // Busy() needs to return True until STB reports the shutter is closed (0).
     if (open)
         return ExecuteCommand("SHUT 1");
     else
@@ -457,15 +453,12 @@ int SpectraPhysicsInsightDS::OnPumpLaser(MM::PropertyBase * pProp, MM::ActionTyp
  */
 int SpectraPhysicsInsightDS::ExecuteCommand(const std::string& cmd, std::string& answer)
 {
-    // Grab the lock...
     std::lock_guard<std::mutex> guard(serialMutex_);
-    // ...then send the command...
 	int ret = SendCommand(cmd);
 	if (ret != DEVICE_OK)
 		return ret;
 
-	// ...then get answer from the device.
-    // It will always end with a line feed.
+    // Answers always end with a line feed.
 	return GetSerialAnswer(port_.c_str(), "\n", answer);
 }
 
@@ -474,9 +467,7 @@ int SpectraPhysicsInsightDS::ExecuteCommand(const std::string& cmd, std::string&
  */
 int SpectraPhysicsInsightDS::ExecuteCommand(const std::string& cmd)
 {
-    // Grab the lock...
     std::lock_guard<std::mutex> guard(serialMutex_);
-    // ...then send the command
     return SendCommand(cmd);
 }
 
