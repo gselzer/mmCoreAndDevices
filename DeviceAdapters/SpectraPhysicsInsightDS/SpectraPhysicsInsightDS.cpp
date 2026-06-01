@@ -171,16 +171,56 @@ bool SpectraPhysicsInsightDS::Busy()
     }
     else if (lastCommand_ == "SHUT 1")
     {
+        // From the manual: "it is normal for the system to return 0 for approximately 1 second
+        // after issuing the SHUTter 1 command"
         std::chrono::duration elapsed = std::chrono::steady_clock::now() - lastCommandTime_;
         return elapsed < std::chrono::seconds(1);
+        // Now return busy until the Main Status Bit is True
+        bool open;
+        int ret = StatusBit(2, open);
+        if (ret != 0)
+            return false;
+        return !open;
     }
     else if (lastCommand_ == "SHUT 0")
     {
-        bool stillOpen;
-        int ret = StatusBit(2, stillOpen);
+        // NOTE: The manual doesn't explicitly suggest that we need to wait for 1 second here.
+        // But that could be an oversight in the manual.
+
+        // Return busy until the Main Shutter Status Bit is False
+        bool open;
+        int ret = StatusBit(2, open);
         if (ret != 0)
             return false;
-        return stillOpen;
+        return open;
+    }
+    else if (lastCommand_ == "IRSHUT 1")
+    {
+        // From the manual: "it is normal for the system to return 0 for approximately 1 second
+        // after issuing the IRSHUTter 1 command"
+        std::chrono::duration elapsed = std::chrono::steady_clock::now() - lastCommandTime_;
+        if (elapsed < std::chrono::seconds(1))
+            return true;
+        // Now return busy until the IRShutter Status Bit is True
+        bool open;
+        int ret = StatusBit(3, open);
+        if (ret != 0)
+            return false;
+        return !open;
+    }
+    else if (lastCommand_ == "IRSHUT 0")
+    {
+        // From the manual: "it is normal for the system to return 1 for approximately 1 second
+        // after issuing the IRSHUTter 0 command."
+        std::chrono::duration elapsed = std::chrono::steady_clock::now() - lastCommandTime_;
+        if (elapsed < std::chrono::seconds(1))
+            return true;
+        // Now return busy until the IRShutter Status Bit is False
+        bool open;
+        int ret = StatusBit(3, open);
+        if (ret != 0)
+            return false;
+        return open;
     }
     return false;
 }
@@ -190,6 +230,8 @@ int SpectraPhysicsInsightDS::DetectInstalledDevices()
     MM::Device *laser = CreateDevice(g_DeviceNameMain);
     if (laser)
         AddInstalledDevice(laser);
+    // TODO: Is there a way to detect whether the 1040nm option is installed?
+
     MM::Device *laser1040 = CreateDevice(g_DeviceName1040);
     if (laser1040)
         AddInstalledDevice(laser1040);
