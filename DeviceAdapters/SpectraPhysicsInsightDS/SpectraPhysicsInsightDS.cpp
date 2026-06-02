@@ -573,7 +573,14 @@ int SpectraPhysicsInsightDSMain::Initialize() {
     if (ret != 0)
         return ret;
 
-
+    // Configure state property
+	CPropertyAction* pActState = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnState);
+    ret = CreateIntegerProperty(MM::g_Keyword_State, 800, false, pActState);
+    if (ret != 0)
+        return ret;
+    ret = SetPropertyLimits(MM::g_Keyword_State, 0, 1);
+    if (ret != 0)
+        return ret;
 
     initialized_ = true;
     return DEVICE_OK;
@@ -646,6 +653,29 @@ int SpectraPhysicsInsightDSMain::OnWavelength(MM::PropertyBase * pProp, MM::Acti
 	return DEVICE_OK;
 }
 
+int SpectraPhysicsInsightDSMain::OnState(MM::PropertyBase * pProp, MM::ActionType eAct)
+{
+	if (eAct == MM::BeforeGet)
+	{
+        bool isOpen{};
+        int ret = GetOpen(isOpen);
+        if (ret != 0)
+            return ret;
+		pProp->Set(isOpen? "1" : "0");
+	}
+	else if (eAct == MM::AfterSet)
+	{
+        std::string cmd;
+        pProp->Get(cmd);
+        int ret = SetOpen(cmd == "1");
+        if (ret != 0)
+            return ret;
+	}
+
+	return DEVICE_OK;
+}
+
+
 
 ////////////////////////////////////////////////////////////////////////////////////
 // 1040nm SHUTTER
@@ -667,6 +697,17 @@ int SpectraPhysicsInsightDS1040::Initialize() {
     if (!hub)
         return ERR_NO_HUB;
     parent_ = dynamic_cast<SpectraPhysicsInsightDS*>(GetParentHub());
+
+    // Configure state property
+    int ret{};
+	CPropertyAction* pActState = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnState);
+    ret = CreateIntegerProperty(MM::g_Keyword_State, 800, false, pActState);
+    if (ret != 0)
+        return ret;
+    ret = SetPropertyLimits(MM::g_Keyword_State, 0, 1);
+    if (ret != 0)
+        return ret;
+
 	initialized_ = true;
     return DEVICE_OK;
 }
@@ -714,6 +755,28 @@ int SpectraPhysicsInsightDS1040::GetOpen(bool& open)
 int SpectraPhysicsInsightDS1040::Fire(double deltaT)
 {
     return DEVICE_UNSUPPORTED_COMMAND;
+}
+
+int SpectraPhysicsInsightDS1040::OnState(MM::PropertyBase * pProp, MM::ActionType eAct)
+{
+	if (eAct == MM::BeforeGet)
+	{
+        bool isOpen{};
+        int ret = GetOpen(isOpen);
+        if (ret != 0)
+            return ret;
+		pProp->Set(isOpen? "1" : "0");
+	}
+	else if (eAct == MM::AfterSet)
+	{
+        std::string cmd;
+        pProp->Get(cmd);
+        int ret = SetOpen(cmd == "1");
+        if (ret != 0)
+            return ret;
+	}
+
+	return DEVICE_OK;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////

@@ -100,6 +100,7 @@ public:
 
 	// Actions
 	int OnWavelength(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnState(MM::PropertyBase* pProp, MM::ActionType eAct);
 private:
 	// Device state
 	bool initialized_;
@@ -118,10 +119,13 @@ public:
     void GetName(char* name) const;
     bool Busy();
 
-   // Shutter API
-   int SetOpen(bool open = true);
-   int GetOpen(bool& open);
-   int Fire(double deltaT);
+	// Shutter API
+	int SetOpen(bool open = true);
+	int GetOpen(bool& open);
+	int Fire(double deltaT);
+
+	// Actions
+	int OnState(MM::PropertyBase* pProp, MM::ActionType eAct);
 private:
 	// Device state
 	bool initialized_;
