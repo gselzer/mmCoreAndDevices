@@ -454,7 +454,9 @@ int SpectraPhysicsInsightDS::OnPumpLaser(MM::PropertyBase * pProp, MM::ActionTyp
 				return ERR_PUMP_LASER_NOT_WARM;
             int state{};
             ret = LaserState(state);
-            if (ret != 25)
+            if (ret != 0)
+                return ret;
+            if (state != 25)
                 return ERR_WAVELENGTH_CHANGING;
             return ExecuteCommand("ON");
 		}
@@ -575,10 +577,13 @@ int SpectraPhysicsInsightDSMain::Initialize() {
 
     // Configure state property
 	CPropertyAction* pActState = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnState);
-    ret = CreateIntegerProperty(MM::g_Keyword_State, 800, false, pActState);
+    ret = CreateIntegerProperty(MM::g_Keyword_State, 0, false, pActState);
     if (ret != 0)
         return ret;
-    ret = SetPropertyLimits(MM::g_Keyword_State, 0, 1);
+    ret = AddAllowedValue(MM::g_Keyword_State, "0");
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue(MM::g_Keyword_State, "1");
     if (ret != 0)
         return ret;
 
@@ -611,9 +616,11 @@ bool SpectraPhysicsInsightDSMain::Busy()
 int SpectraPhysicsInsightDSMain::SetOpen(bool open)
 {
     if (open) {
-        int ret{}, state{};
+		int ret{}, state{};
 		ret = parent_->LaserState(state);
-		if (ret != 50)
+		if (ret != 0)
+            return ret;
+		if (state != 50)
 			return ERR_PUMP_LASER_TURNING_ON;
         return parent_->ExecuteCommand("SHUT 1");
     }
@@ -670,6 +677,7 @@ int SpectraPhysicsInsightDSMain::OnState(MM::PropertyBase * pProp, MM::ActionTyp
         int ret = SetOpen(cmd == "1");
         if (ret != 0)
             return ret;
+        GetCoreCallback()->OnShutterOpenChanged(this, cmd == "1");
 	}
 
 	return DEVICE_OK;
@@ -700,11 +708,14 @@ int SpectraPhysicsInsightDS1040::Initialize() {
 
     // Configure state property
     int ret{};
-	CPropertyAction* pActState = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnState);
-    ret = CreateIntegerProperty(MM::g_Keyword_State, 800, false, pActState);
+	CPropertyAction* pActState = new CPropertyAction(this, &SpectraPhysicsInsightDS1040::OnState);
+    ret = CreateIntegerProperty(MM::g_Keyword_State, 0, false, pActState);
     if (ret != 0)
         return ret;
-    ret = SetPropertyLimits(MM::g_Keyword_State, 0, 1);
+    ret = AddAllowedValue(MM::g_Keyword_State, "0");
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue(MM::g_Keyword_State, "1");
     if (ret != 0)
         return ret;
 
@@ -738,7 +749,9 @@ int SpectraPhysicsInsightDS1040::SetOpen(bool open)
     if (open) {
         int ret{}, state{};
 		ret = parent_->LaserState(state);
-		if (ret != 50)
+        if (ret != 0)
+            return ret;
+		if (state != 50)
 			return ERR_PUMP_LASER_TURNING_ON;
         return parent_->ExecuteCommand("IRSHUT 1");
     }
@@ -774,6 +787,7 @@ int SpectraPhysicsInsightDS1040::OnState(MM::PropertyBase * pProp, MM::ActionTyp
         int ret = SetOpen(cmd == "1");
         if (ret != 0)
             return ret;
+        GetCoreCallback()->OnShutterOpenChanged(this, cmd == "1");
 	}
 
 	return DEVICE_OK;
