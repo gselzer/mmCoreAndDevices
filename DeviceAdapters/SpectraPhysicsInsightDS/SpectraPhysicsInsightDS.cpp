@@ -185,7 +185,7 @@ int SpectraPhysicsInsightDS::Initialize()
 
     initialized_ = true;
 
-	// Start the watchdog thread. We do it here so Shutdown cleans it up.
+	// Start the watchdog thread. We Start it after setting initialized_ so Shutdown cleans it up.
     if (!watchdogDisabled_)
         watchdogThread_->Start();
 
@@ -286,8 +286,8 @@ int SpectraPhysicsInsightDS::DetectInstalledDevices()
     MM::Device *laser = CreateDevice(g_DeviceNameMain);
     if (laser)
         AddInstalledDevice(laser);
-    // TODO: Is there a way to detect whether the 1040nm option is installed?
 
+    // TODO: Is there a way to detect whether the 1040nm option is installed?
     MM::Device *laser1040 = CreateDevice(g_DeviceName1040);
     if (laser1040)
         AddInstalledDevice(laser1040);
@@ -445,6 +445,7 @@ int SpectraPhysicsInsightDS::OnPumpLaser(MM::PropertyBase * pProp, MM::ActionTyp
         pProp->Get(cmd);
         if (cmd == g_On)
         {
+            // Ensure that the laser is warmed up - otherwise the command will be ignored
             std::string warmupPct{};
             int ret{};
 			ret = ExecuteCommand("READ:PCTW?", warmupPct);
@@ -452,12 +453,17 @@ int SpectraPhysicsInsightDS::OnPumpLaser(MM::PropertyBase * pProp, MM::ActionTyp
 				return ret;
 			if (stoi(warmupPct) < 100)
 				return ERR_PUMP_LASER_NOT_WARM;
+            // Also check the laser state for value 25, indicating
+            // "READY to turn on (i.e. the laser is fully warmed up".
+            //
+            // NOTE: This check may be redundant...
             int state{};
             ret = LaserState(state);
             if (ret != 0)
                 return ret;
             if (state != 25)
                 return ERR_WAVELENGTH_CHANGING;
+            // Passed checks, turning on
             return ExecuteCommand("ON");
 		}
         else
