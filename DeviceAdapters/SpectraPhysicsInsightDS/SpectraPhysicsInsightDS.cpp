@@ -127,6 +127,61 @@ int SpectraPhysicsInsightDS::Initialize()
 	if (ret != 0)
 		return ret;
 
+    // Configure pump laser property
+	CPropertyAction* pActPumpLaser = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnPumpLaser);
+    ret = CreateStringProperty("Pump Laser", g_Off, false, pActPumpLaser);
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("Pump Laser", g_Off);
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("Pump Laser", g_On);
+    if (ret != 0)
+        return ret;
+
+    // Configure humidity property (read-only)
+	CPropertyAction* pActHumidity = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnHumidity);
+    ret = CreateIntegerProperty("RelativeHumidity", 0, true, pActHumidity);
+    if (ret != 0)
+        return ret;
+
+    // Configure warmup percentage property (read-only)
+	CPropertyAction* pActWarmup = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnWarmup);
+    ret = CreateIntegerProperty("Warmup Percentage", 0, true, pActWarmup);
+    if (ret != 0)
+        return ret;
+
+    // Configure diode1 current property (read-only)
+	CPropertyAction* pActDiode1Current = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnDiode1Current);
+    ret = CreateFloatProperty("Diode 1 Current", 0, true, pActDiode1Current);
+    if (ret != 0)
+        return ret;
+
+    // Configure diode2 current property (read-only)
+	CPropertyAction* pActDiode2Current = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnDiode2Current);
+    ret = CreateFloatProperty("Diode 2 Current", 0, true, pActDiode2Current);
+    if (ret != 0)
+        return ret;
+
+    // Configure diode1 temperature property (read-only)
+	CPropertyAction* pActDiode1Temp = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnDiode1Temp);
+    ret = CreateFloatProperty("Diode 1 Temperature (Celsius)", 0, true, pActDiode1Temp);
+    if (ret != 0)
+        return ret;
+
+    // Configure diode2 temperature property (read-only)
+	CPropertyAction* pActDiode2Temp = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnDiode2Temp);
+    ret = CreateFloatProperty("Diode 2 Temperature (Celsius)", 0, true, pActDiode2Temp);
+    if (ret != 0)
+        return ret;
+
+    // Configure output power property (read-only)
+	CPropertyAction* pActPower = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnPower);
+    ret = CreateFloatProperty("Laser Power (Watts)", 0, true, pActPower);
+    if (ret != 0)
+        return ret;
+
+
 
     initialized_ = true;
 
@@ -174,7 +229,8 @@ bool SpectraPhysicsInsightDS::Busy()
         // From the manual: "it is normal for the system to return 0 for approximately 1 second
         // after issuing the SHUTter 1 command"
         std::chrono::duration elapsed = std::chrono::steady_clock::now() - lastCommandTime_;
-        return elapsed < std::chrono::seconds(1);
+        if (elapsed < std::chrono::seconds(1))
+            return true;
         // Now return busy until the Main Status Bit is True
         bool open;
         int ret = StatusBit(2, open);
@@ -280,33 +336,12 @@ int SpectraPhysicsInsightDS::OnWatchdog(MM::PropertyBase * pProp, MM::ActionType
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsightDSMain::OnWavelength(MM::PropertyBase * pProp, MM::ActionType eAct)
-{
-	if (eAct == MM::BeforeGet)
-	{
-        std::string wavelength;
-        int ret = parent_->ExecuteCommand("READ:WAV?", wavelength);
-        if (ret != 0)
-            return ret;
-		pProp->Set(wavelength.c_str());
-	}
-	else if (eAct == MM::AfterSet)
-	{
-        std::string cmd;
-        pProp->Get(cmd);
-        cmd = "WAV " + cmd;
-        return parent_->ExecuteCommand(cmd);
-	}
-
-	return DEVICE_OK;
-}
-
-int SpectraPhysicsInsightDSMain::OnWarmup(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsInsightDS::OnWarmup(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
         std::string warmupPct;
-        int ret = parent_->ExecuteCommand("READ:PCTW?", warmupPct);
+        int ret = ExecuteCommand("READ:PCTW?", warmupPct);
         if (ret != 0)
             return ret;
 		pProp->Set(warmupPct.c_str());
@@ -314,12 +349,12 @@ int SpectraPhysicsInsightDSMain::OnWarmup(MM::PropertyBase * pProp, MM::ActionTy
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsightDSMain::OnHumidity(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsInsightDS::OnHumidity(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
         std::string humidityPct;
-        int ret = parent_->ExecuteCommand("READ:HUM?", humidityPct);
+        int ret = ExecuteCommand("READ:HUM?", humidityPct);
         if (ret != 0)
             return ret;
 		pProp->Set(humidityPct.c_str());
@@ -327,12 +362,12 @@ int SpectraPhysicsInsightDSMain::OnHumidity(MM::PropertyBase * pProp, MM::Action
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsightDSMain::OnDiode1Current(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsInsightDS::OnDiode1Current(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
         std::string diode1Current;
-        int ret = parent_->ExecuteCommand("READ:PLAS:DIOD1:CURR?", diode1Current);
+        int ret = ExecuteCommand("READ:PLAS:DIOD1:CURR?", diode1Current);
         if (ret != 0)
             return ret;
 		pProp->Set(diode1Current.c_str());
@@ -340,12 +375,12 @@ int SpectraPhysicsInsightDSMain::OnDiode1Current(MM::PropertyBase * pProp, MM::A
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsightDSMain::OnDiode2Current(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsInsightDS::OnDiode2Current(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
         std::string diode2Current;
-        int ret = parent_->ExecuteCommand("READ:PLAS:DIOD2:CURR?", diode2Current);
+        int ret = ExecuteCommand("READ:PLAS:DIOD2:CURR?", diode2Current);
         if (ret != 0)
             return ret;
 		pProp->Set(diode2Current.c_str());
@@ -353,12 +388,12 @@ int SpectraPhysicsInsightDSMain::OnDiode2Current(MM::PropertyBase * pProp, MM::A
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsightDSMain::OnDiode1Temp(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsInsightDS::OnDiode1Temp(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
         std::string diode1Temperature;
-        int ret = parent_->ExecuteCommand("READ:PLAS:DIOD1:TEMP?", diode1Temperature);
+        int ret = ExecuteCommand("READ:PLAS:DIOD1:TEMP?", diode1Temperature);
         if (ret != 0)
             return ret;
 		pProp->Set(diode1Temperature.c_str());
@@ -366,12 +401,12 @@ int SpectraPhysicsInsightDSMain::OnDiode1Temp(MM::PropertyBase * pProp, MM::Acti
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsightDSMain::OnDiode2Temp(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsInsightDS::OnDiode2Temp(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
         std::string diode2Temperature;
-        int ret = parent_->ExecuteCommand("READ:PLAS:DIOD2:TEMP?", diode2Temperature);
+        int ret = ExecuteCommand("READ:PLAS:DIOD2:TEMP?", diode2Temperature);
         if (ret != 0)
             return ret;
 		pProp->Set(diode2Temperature.c_str());
@@ -379,12 +414,12 @@ int SpectraPhysicsInsightDSMain::OnDiode2Temp(MM::PropertyBase * pProp, MM::Acti
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsightDSMain::OnPower(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsInsightDS::OnPower(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
         std::string power;
-        int ret = parent_->ExecuteCommand("READ:POW?", power);
+        int ret = ExecuteCommand("READ:POW?", power);
         if (ret != 0)
             return ret;
 		pProp->Set(power.c_str());
@@ -393,13 +428,13 @@ int SpectraPhysicsInsightDSMain::OnPower(MM::PropertyBase * pProp, MM::ActionTyp
 }
 
 
-int SpectraPhysicsInsightDSMain::OnPumpLaser(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsInsightDS::OnPumpLaser(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
 		// Bit 0 identifies energized state, 1 means energized
         bool isEnergized;
-		int ret = parent_->StatusBit(0, isEnergized);
+		int ret = StatusBit(0, isEnergized);
         if (ret != 0)
             return ret;
         pProp->Set(isEnergized ? g_On : g_Off);
@@ -412,20 +447,20 @@ int SpectraPhysicsInsightDSMain::OnPumpLaser(MM::PropertyBase * pProp, MM::Actio
         {
             std::string warmupPct{};
             int ret{};
-			ret = parent_->ExecuteCommand("READ:PCTW?", warmupPct);
+			ret = ExecuteCommand("READ:PCTW?", warmupPct);
 			if (ret != 0)
 				return ret;
 			if (stoi(warmupPct) < 100)
 				return ERR_PUMP_LASER_NOT_WARM;
             int state{};
-            ret = parent_->LaserState(state);
+            ret = LaserState(state);
             if (ret != 25)
                 return ERR_WAVELENGTH_CHANGING;
-            return parent_->ExecuteCommand("ON");
+            return ExecuteCommand("ON");
 		}
         else
         {
-            return parent_->ExecuteCommand("OFF");
+            return ExecuteCommand("OFF");
         }
 	}
 
@@ -538,60 +573,6 @@ int SpectraPhysicsInsightDSMain::Initialize() {
     if (ret != 0)
         return ret;
 
-    // Configure pump laser property
-	CPropertyAction* pActPumpLaser = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnPumpLaser);
-    ret = CreateStringProperty("Pump Laser", g_Off, false, pActPumpLaser);
-    if (ret != 0)
-        return ret;
-    ret = AddAllowedValue("Pump Laser", g_Off);
-    if (ret != 0)
-        return ret;
-    ret = AddAllowedValue("Pump Laser", g_On);
-    if (ret != 0)
-        return ret;
-
-    // Configure humidity property (read-only)
-	CPropertyAction* pActHumidity = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnHumidity);
-    ret = CreateIntegerProperty("RelativeHumidity", 0, true, pActHumidity);
-    if (ret != 0)
-        return ret;
-
-    // Configure warmup percentage property (read-only)
-	CPropertyAction* pActWarmup = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnWarmup);
-    ret = CreateIntegerProperty("Warmup Percentage", 0, true, pActWarmup);
-    if (ret != 0)
-        return ret;
-
-    // Configure diode1 current property (read-only)
-	CPropertyAction* pActDiode1Current = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnDiode1Current);
-    ret = CreateFloatProperty("Diode 1 Current", 0, true, pActDiode1Current);
-    if (ret != 0)
-        return ret;
-
-    // Configure diode2 current property (read-only)
-	CPropertyAction* pActDiode2Current = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnDiode2Current);
-    ret = CreateFloatProperty("Diode 2 Current", 0, true, pActDiode2Current);
-    if (ret != 0)
-        return ret;
-
-    // Configure diode1 temperature property (read-only)
-	CPropertyAction* pActDiode1Temp = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnDiode1Temp);
-    ret = CreateFloatProperty("Diode 1 Temperature (Celsius)", 0, true, pActDiode1Temp);
-    if (ret != 0)
-        return ret;
-
-    // Configure diode2 temperature property (read-only)
-	CPropertyAction* pActDiode2Temp = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnDiode2Temp);
-    ret = CreateFloatProperty("Diode 2 Temperature (Celsius)", 0, true, pActDiode2Temp);
-    if (ret != 0)
-        return ret;
-
-    // Configure output power property (read-only)
-	CPropertyAction* pActPower = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnPower);
-    ret = CreateFloatProperty("Laser Power (Watts)", 0, true, pActPower);
-    if (ret != 0)
-        return ret;
-
 
 
     initialized_ = true;
@@ -642,6 +623,27 @@ int SpectraPhysicsInsightDSMain::GetOpen(bool& open)
 int SpectraPhysicsInsightDSMain::Fire(double deltaT)
 {
    return DEVICE_UNSUPPORTED_COMMAND;
+}
+
+int SpectraPhysicsInsightDSMain::OnWavelength(MM::PropertyBase * pProp, MM::ActionType eAct)
+{
+	if (eAct == MM::BeforeGet)
+	{
+        std::string wavelength;
+        int ret = parent_->ExecuteCommand("READ:WAV?", wavelength);
+        if (ret != 0)
+            return ret;
+		pProp->Set(wavelength.c_str());
+	}
+	else if (eAct == MM::AfterSet)
+	{
+        std::string cmd;
+        pProp->Get(cmd);
+        cmd = "WAV " + cmd;
+        return parent_->ExecuteCommand(cmd);
+	}
+
+	return DEVICE_OK;
 }
 
 

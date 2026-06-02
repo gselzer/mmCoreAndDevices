@@ -53,6 +53,16 @@ public:
 	// Pre-Init Actions
 	int OnPort(MM::PropertyBase * pProp, MM::ActionType eAct);
 	int OnWatchdog(MM::PropertyBase * pProp, MM::ActionType eAct);
+	// Actions
+	int OnPumpLaser(MM::PropertyBase* pProp, MM::ActionType eAct);
+	// Read-only Actions
+	int OnWarmup(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnHumidity(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnDiode1Current(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnDiode2Current(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnDiode1Temp(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnDiode2Temp(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnPower(MM::PropertyBase* pProp, MM::ActionType eAct);
 
 private:
 	// Device state
@@ -90,15 +100,6 @@ public:
 
 	// Actions
 	int OnWavelength(MM::PropertyBase* pProp, MM::ActionType eAct);
-	int OnPumpLaser(MM::PropertyBase* pProp, MM::ActionType eAct);
-	// Read-only Actions
-	int OnWarmup(MM::PropertyBase* pProp, MM::ActionType eAct);
-	int OnHumidity(MM::PropertyBase* pProp, MM::ActionType eAct);
-	int OnDiode1Current(MM::PropertyBase* pProp, MM::ActionType eAct);
-	int OnDiode2Current(MM::PropertyBase* pProp, MM::ActionType eAct);
-	int OnDiode1Temp(MM::PropertyBase* pProp, MM::ActionType eAct);
-	int OnDiode2Temp(MM::PropertyBase* pProp, MM::ActionType eAct);
-	int OnPower(MM::PropertyBase* pProp, MM::ActionType eAct);
 private:
 	// Device state
 	bool initialized_;
