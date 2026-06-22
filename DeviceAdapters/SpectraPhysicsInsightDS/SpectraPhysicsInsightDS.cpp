@@ -175,13 +175,29 @@ int SpectraPhysicsInsightDS::Initialize()
     if (ret != 0)
         return ret;
 
+    // Configure diode1 hours property (read-only)
+	CPropertyAction* pActDiode1Hours = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnDiode1Hours);
+    ret = CreateFloatProperty("Diode 1 Accumulated Hours", 0, true, pActDiode1Hours);
+    if (ret != 0)
+        return ret;
+
+    // Configure diode2 hours property (read-only)
+	CPropertyAction* pActDiode2Hours = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnDiode2Hours);
+    ret = CreateFloatProperty("Diode 2 Accumulated Hours", 0, true, pActDiode2Hours);
+    if (ret != 0)
+        return ret;
+
     // Configure output power property (read-only)
 	CPropertyAction* pActPower = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnPower);
     ret = CreateFloatProperty("Laser Power (Watts)", 0, true, pActPower);
     if (ret != 0)
         return ret;
 
-
+    // Configure history buffer property (read-only)
+	CPropertyAction* pActHistoryBuffer = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnHistoryBuffer);
+    ret = CreateStringProperty("Status Code Buffer", "", true, pActHistoryBuffer);
+    if (ret != 0)
+        return ret;
 
     initialized_ = true;
 
@@ -414,6 +430,32 @@ int SpectraPhysicsInsightDS::OnDiode2Temp(MM::PropertyBase * pProp, MM::ActionTy
 	return DEVICE_OK;
 }
 
+int SpectraPhysicsInsightDS::OnDiode1Hours(MM::PropertyBase * pProp, MM::ActionType eAct)
+{
+	if (eAct == MM::BeforeGet)
+	{
+        std::string diode1Hours;
+        int ret = ExecuteCommand("READ:PLAS:DIOD1:HOURS?", diode1Hours);
+        if (ret != 0)
+            return ret;
+		pProp->Set(diode1Hours.c_str());
+	}
+	return DEVICE_OK;
+}
+
+int SpectraPhysicsInsightDS::OnDiode2Hours(MM::PropertyBase * pProp, MM::ActionType eAct)
+{
+	if (eAct == MM::BeforeGet)
+	{
+        std::string diode2Hours;
+        int ret = ExecuteCommand("READ:PLAS:DIOD2:HOURS?", diode2Hours);
+        if (ret != 0)
+            return ret;
+		pProp->Set(diode2Hours.c_str());
+	}
+	return DEVICE_OK;
+}
+
 int SpectraPhysicsInsightDS::OnPower(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
@@ -427,6 +469,20 @@ int SpectraPhysicsInsightDS::OnPower(MM::PropertyBase * pProp, MM::ActionType eA
 	return DEVICE_OK;
 }
 
+int SpectraPhysicsInsightDS::OnHistoryBuffer(MM::PropertyBase * pProp, MM::ActionType eAct)
+{
+	if (eAct == MM::BeforeGet)
+	{
+        std::string power;
+        // TODO This might actually be READ:AHIST?
+        // Likely a typo in the manual.
+        int ret = ExecuteCommand("READ:HIS?", power);
+        if (ret != 0)
+            return ret;
+		pProp->Set(power.c_str());
+	}
+	return DEVICE_OK;
+}
 
 int SpectraPhysicsInsightDS::OnPumpLaser(MM::PropertyBase * pProp, MM::ActionType eAct)
 {

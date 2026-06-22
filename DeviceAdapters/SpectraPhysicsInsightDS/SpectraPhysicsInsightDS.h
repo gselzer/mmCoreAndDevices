@@ -62,7 +62,10 @@ public:
 	int OnDiode2Current(MM::PropertyBase* pProp, MM::ActionType eAct);
 	int OnDiode1Temp(MM::PropertyBase* pProp, MM::ActionType eAct);
 	int OnDiode2Temp(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnDiode1Hours(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnDiode2Hours(MM::PropertyBase* pProp, MM::ActionType eAct);
 	int OnPower(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnHistoryBuffer(MM::PropertyBase* pProp, MM::ActionType eAct);
 
 private:
 	// Device state
