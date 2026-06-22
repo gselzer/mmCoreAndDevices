@@ -502,12 +502,20 @@ int SpectraPhysicsInsightDS::OnPumpLaser(MM::PropertyBase * pProp, MM::ActionTyp
         if (cmd == g_On)
         {
             // Ensure that the laser is warmed up - otherwise the command will be ignored
-            std::string warmupPct{};
+            std::string warmupStr{};
             int ret{};
-			ret = ExecuteCommand("READ:PCTW?", warmupPct);
+			ret = ExecuteCommand("READ:PCTW?", warmupStr);
 			if (ret != 0)
 				return ret;
-			if (stoi(warmupPct) < 100)
+
+            int warmupPct{};
+            try {
+                warmupPct = stoi(warmupStr);
+            }
+            catch (std::exception&) {
+                return DEVICE_ERR;
+            }
+			if (warmupPct < 100)
 				return ERR_PUMP_LASER_NOT_WARM;
             // Also check the laser state for value 25, indicating
             // "READY to turn on (i.e. the laser is fully warmed up".
@@ -580,7 +588,13 @@ int SpectraPhysicsInsightDS::StatusBit(unsigned int bitNumber, bool& bit)
     if (ret != 0)
         return ret;
 
-    unsigned int status_byte = stoul(status_int);
+    unsigned int status_byte{};
+    try {
+        status_byte = stoul(status_int);
+    }
+    catch (std::exception&) {
+        return DEVICE_ERR;
+    }
     unsigned int bit_mask = 1u << bitNumber;
     bit = (status_byte & bit_mask) != 0;
     return DEVICE_OK;
@@ -593,7 +607,13 @@ int SpectraPhysicsInsightDS::LaserState(int& state)
     if (ret != 0)
         return ret;
 
-    unsigned int status_byte = stoul(status_int);
+    unsigned int status_byte{};
+    try {
+        status_byte = stoul(status_int);
+    }
+    catch (std::exception&) {
+        return DEVICE_ERR;
+    }
     unsigned int bit_mask = 0x007F0000;
     state = (status_byte & bit_mask) >> 16;
     return DEVICE_OK;
@@ -618,22 +638,32 @@ int SpectraPhysicsInsightDSMain::Initialize() {
     MM::Hub* hub = GetParentHub();
     if (!hub)
         return ERR_NO_HUB;
-    parent_ = dynamic_cast<SpectraPhysicsInsightDS*>(GetParentHub());
+    parent_ = dynamic_cast<SpectraPhysicsInsightDS*>(hub);
+    if (!parent_)
+        return ERR_NO_HUB;
 
     // Configure wavelength property
-    std::string wave_min{}, wave_max{};
+    std::string wave_min_str{}, wave_max_str{};
     int ret{};
-    ret = parent_->ExecuteCommand("WAV:min?", wave_min);
+    ret = parent_->ExecuteCommand("WAV:min?", wave_min_str);
     if (ret != 0)
         return ret;
-    ret = parent_->ExecuteCommand("WAV:max?", wave_max);
+    ret = parent_->ExecuteCommand("WAV:max?", wave_max_str);
     if (ret != 0)
         return ret;
 	CPropertyAction* pActWavelength = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnWavelength);
     ret = CreateIntegerProperty("Wavelength", 800, false, pActWavelength);
     if (ret != 0)
         return ret;
-    ret = SetPropertyLimits("Wavelength", stoi(wave_min), stoi(wave_max));
+    int wave_min{}, wave_max{};
+    try {
+        wave_min = stoi(wave_min_str);
+        wave_max = stoi(wave_max_str);
+    }
+    catch (std::exception&) {
+        return DEVICE_ERR;
+    }
+    ret = SetPropertyLimits("Wavelength", wave_min, wave_max);
     if (ret != 0)
         return ret;
 
@@ -766,7 +796,9 @@ int SpectraPhysicsInsightDS1040::Initialize() {
     MM::Hub* hub = GetParentHub();
     if (!hub)
         return ERR_NO_HUB;
-    parent_ = dynamic_cast<SpectraPhysicsInsightDS*>(GetParentHub());
+    parent_ = dynamic_cast<SpectraPhysicsInsightDS*>(hub);
+    if (!parent_)
+        return ERR_NO_HUB;
 
     // Configure state property
     int ret{};
