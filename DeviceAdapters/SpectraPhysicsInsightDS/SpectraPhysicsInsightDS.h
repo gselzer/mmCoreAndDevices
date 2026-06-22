@@ -52,8 +52,8 @@ public:
 
 	// Pre-Init Actions
 	int OnPort(MM::PropertyBase * pProp, MM::ActionType eAct);
-	int OnWatchdog(MM::PropertyBase * pProp, MM::ActionType eAct);
 	// Actions
+	int OnWatchdog(MM::PropertyBase * pProp, MM::ActionType eAct);
 	int OnPumpLaser(MM::PropertyBase* pProp, MM::ActionType eAct);
 	// Read-only Actions
 	int OnWarmup(MM::PropertyBase* pProp, MM::ActionType eAct);
@@ -71,7 +71,7 @@ private:
 	// Device state
 	bool initialized_;
 	std::string port_;
-	bool watchdogDisabled_;
+	std::atomic<bool> watchdogDisabled_;
 	std::string lastCommand_;
 	std::chrono::steady_clock::time_point lastCommandTime_;
 	std::mutex serialMutex_;
@@ -147,7 +147,7 @@ private:
     SpectraPhysicsInsightDS& device_;
     std::mutex stopMutex_;
     std::condition_variable timerCV_;
-    bool stop_;
+    std::atomic<bool> stop_;
     std::chrono::steady_clock::duration interval_;
 
 };

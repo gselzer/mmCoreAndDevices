@@ -86,12 +86,6 @@ SpectraPhysicsInsightDS::SpectraPhysicsInsightDS() :
 	CPropertyAction* pActPort = new CPropertyAction (this, &SpectraPhysicsInsightDS::OnPort);
 	CreateStringProperty(MM::g_Keyword_Port, "Undefined", false, pActPort, true);
 
-    // Watchdog disable property - shouldn't be used very often
-    std::string watchdogProp = "DISABLE WATCHDOG TIMER";
-	CPropertyAction* pActWatchdog = new CPropertyAction (this, &SpectraPhysicsInsightDS::OnWatchdog);
-	CreateStringProperty(watchdogProp.c_str(), g_No, false, pActWatchdog, true);
-    AddAllowedValue(watchdogProp.c_str(), g_No);
-    AddAllowedValue(watchdogProp.c_str(), g_Yes);
 }
 
 SpectraPhysicsInsightDS::~SpectraPhysicsInsightDS()
@@ -123,9 +117,22 @@ int SpectraPhysicsInsightDS::Initialize()
         return DEVICE_NOT_CONNECTED;
     }
 
-	ret = ExecuteCommand(watchdogDisabled_ ? "TIM:WATC 0" : "TIM:WATC 3");
-	if (ret != 0)
-		return ret;
+    // Watchdog disable property - shouldn't be used very often
+    std::string watchdogProp = "DISABLE WATCHDOG TIMER";
+	CPropertyAction* pActWatchdog = new CPropertyAction (this, &SpectraPhysicsInsightDS::OnWatchdog);
+	ret = CreateStringProperty(watchdogProp.c_str(), g_No, false, pActWatchdog);
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue(watchdogProp.c_str(), g_No);
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue(watchdogProp.c_str(), g_Yes);
+    if (ret != 0)
+        return ret;
+    // (and initialize the watchdog timer)
+    ret = SetProperty(watchdogProp.c_str(), g_No);
+    if (ret != 0)
+        return ret;
 
     // Configure pump laser property
 	CPropertyAction* pActPumpLaser = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnPumpLaser);
@@ -202,8 +209,7 @@ int SpectraPhysicsInsightDS::Initialize()
     initialized_ = true;
 
 	// Start the watchdog thread. We Start it after setting initialized_ so Shutdown cleans it up.
-    if (!watchdogDisabled_)
-        watchdogThread_->Start();
+	watchdogThread_->Start();
 
     return DEVICE_OK;
 }
@@ -334,19 +340,17 @@ int SpectraPhysicsInsightDS::OnWatchdog(MM::PropertyBase * pProp, MM::ActionType
 {
 	if (eAct == MM::BeforeGet)
 	{
-		pProp->Set(watchdogDisabled_ ? g_Yes : g_No);
+		pProp->Set(watchdogDisabled_.load() ? g_Yes : g_No);
 	}
 	else if (eAct == MM::AfterSet)
 	{
-		if (initialized_)
-		{
-			// revert
-			pProp->Set(watchdogDisabled_ ? g_Yes : g_No);
-			return ERR_WATCHDOG_CHANGE_FORBIDDEN;
-		}
         std::string disabledStr;
 		pProp->Get(disabledStr);
-        watchdogDisabled_ = (disabledStr == g_Yes);
+        watchdogDisabled_.store(disabledStr == g_Yes);
+
+        int	ret = ExecuteCommand(watchdogDisabled_.load() ? "TIM:WATC 0" : "TIM:WATC 3");
+		if (ret != 0)
+			return ret;
 	}
 
 	return DEVICE_OK;
@@ -904,7 +908,7 @@ WatchdogThread::~WatchdogThread() {
 
 void WatchdogThread::Start()
 {
-    stop_ = false;
+    stop_.store(false);
     activate();
 }
 
@@ -916,7 +920,7 @@ void WatchdogThread::Stop()
 {
     {
         std::unique_lock<std::mutex> lock(stopMutex_);
-        stop_ = true;
+        stop_.store(true);
     }
     timerCV_.notify_all();
     wait();
@@ -931,17 +935,19 @@ int WatchdogThread::svc() {
             // (1) stop_ is true (Stop() sets this and notifies the CV to wake us early)
             // (2) The duration interval_ elapses
             // The predicate handles spurious wakeups by re-sleeping if stop_ is still false.
-            timerCV_.wait_for(lock, interval_, [this] { return stop_; });
-            if (stop_)
+            timerCV_.wait_for(lock, interval_, [this] { return stop_.load(); });
+            if (stop_.load())
             {
                 device_.LogMessage("Spectra Insight Watchdog Thread: Stop requested, exiting", true);
                 break;
             }
         }
         // Just need to do something that sends a command
-        int state;
-        device_.LaserState(state);
-        device_.LogMessage("Spectra Insight Watchdog Thread: Pinging laser", true);
+        if (!device_.watchdogDisabled_.load()) {
+            device_.LogMessage("Spectra Insight Watchdog Thread: Pinging laser", true);
+            int state;
+            device_.LaserState(state);
+        }
 
     }
 
