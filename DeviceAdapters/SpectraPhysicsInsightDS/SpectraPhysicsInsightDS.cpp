@@ -484,9 +484,8 @@ int SpectraPhysicsInsightDS::OnHistoryBuffer(MM::PropertyBase * pProp, MM::Actio
 	if (eAct == MM::BeforeGet)
 	{
         std::string power;
-        // TODO This might actually be READ:AHIST?
-        // Likely a typo in the manual.
-        int ret = ExecuteCommand("READ:HIS?", power);
+        // NOTE that the manual sometimes uses READ:HIS?. It seems that is a typo.
+        int ret = ExecuteCommand("READ:AHIS?", power);
         if (ret != 0)
             return ret;
 		pProp->Set(power.c_str());
