@@ -200,6 +200,12 @@ int SpectraPhysicsInsightDS::Initialize()
     if (ret != 0)
         return ret;
 
+    // Configure laser state property (read-only)
+	CPropertyAction* pActLaserState = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnLaserState);
+    ret = CreateIntegerProperty("Laser State", 0, true, pActLaserState);
+    if (ret != 0)
+        return ret;
+
     // Configure history buffer property (read-only)
 	CPropertyAction* pActHistoryBuffer = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnHistoryBuffer);
     ret = CreateStringProperty("Status Code Buffer", "", true, pActHistoryBuffer);
@@ -484,6 +490,19 @@ int SpectraPhysicsInsightDS::OnHistoryBuffer(MM::PropertyBase * pProp, MM::Actio
         if (ret != 0)
             return ret;
 		pProp->Set(power.c_str());
+	}
+	return DEVICE_OK;
+}
+
+int SpectraPhysicsInsightDS::OnLaserState(MM::PropertyBase * pProp, MM::ActionType eAct)
+{
+	if (eAct == MM::BeforeGet)
+	{
+        int state{};
+        int ret = LaserState(state);
+        if (ret != 0)
+            return ret;
+		pProp->Set(std::to_string(state).c_str());
 	}
 	return DEVICE_OK;
 }

@@ -66,6 +66,7 @@ public:
 	int OnDiode2Hours(MM::PropertyBase* pProp, MM::ActionType eAct);
 	int OnPower(MM::PropertyBase* pProp, MM::ActionType eAct);
 	int OnHistoryBuffer(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnLaserState(MM::PropertyBase* pProp, MM::ActionType eAct);
 
 private:
 	// Device state
