@@ -20,9 +20,9 @@
 #include <chrono>
 #include <cstring>
 
-const char* g_DeviceNameHub = "SpectraPhysicsInsightDS+";
-const char* g_DeviceNameMain = "SpectraPhysicsInsightDS+ Main Shutter";
-const char* g_DeviceName1040 = "SpectraPhysicsInsightDS+ 1040nm Shutter";
+const char* g_DeviceNameHub = "InsightDS+";
+const char* g_DeviceNameMain = "InsightDS+ Main";
+const char* g_DeviceName1040 = "InsightDS+ 1040nm";
 const char* g_On = "On";
 const char* g_Off = "Off";
 const char* g_Yes = "Yes";
