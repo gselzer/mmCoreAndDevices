@@ -148,37 +148,37 @@ int SpectraPhysicsInsightDS::Initialize()
 
     // Configure humidity property (read-only)
 	CPropertyAction* pActHumidity = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnHumidity);
-    ret = CreateIntegerProperty("Relative Humidity", 0, true, pActHumidity);
+    ret = CreateIntegerProperty("Relative Humidity (%)", 0, true, pActHumidity);
     if (ret != 0)
         return ret;
 
     // Configure warmup percentage property (read-only)
 	CPropertyAction* pActWarmup = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnWarmup);
-    ret = CreateIntegerProperty("Warmup Percentage", 0, true, pActWarmup);
+    ret = CreateIntegerProperty("Warmup Percentage (%)", 0, true, pActWarmup);
     if (ret != 0)
         return ret;
 
     // Configure diode1 current property (read-only)
 	CPropertyAction* pActDiode1Current = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnDiode1Current);
-    ret = CreateFloatProperty("Diode 1 Current", 0, true, pActDiode1Current);
+    ret = CreateFloatProperty("Diode 1 Current (A)", 0, true, pActDiode1Current);
     if (ret != 0)
         return ret;
 
     // Configure diode2 current property (read-only)
 	CPropertyAction* pActDiode2Current = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnDiode2Current);
-    ret = CreateFloatProperty("Diode 2 Current", 0, true, pActDiode2Current);
+    ret = CreateFloatProperty("Diode 2 Current (A)", 0, true, pActDiode2Current);
     if (ret != 0)
         return ret;
 
     // Configure diode1 temperature property (read-only)
 	CPropertyAction* pActDiode1Temp = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnDiode1Temp);
-    ret = CreateFloatProperty("Diode 1 Temperature (Celsius)", 0, true, pActDiode1Temp);
+    ret = CreateFloatProperty("Diode 1 Temperature (C)", 0, true, pActDiode1Temp);
     if (ret != 0)
         return ret;
 
     // Configure diode2 temperature property (read-only)
 	CPropertyAction* pActDiode2Temp = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnDiode2Temp);
-    ret = CreateFloatProperty("Diode 2 Temperature (Celsius)", 0, true, pActDiode2Temp);
+    ret = CreateFloatProperty("Diode 2 Temperature (C)", 0, true, pActDiode2Temp);
     if (ret != 0)
         return ret;
 
@@ -196,7 +196,7 @@ int SpectraPhysicsInsightDS::Initialize()
 
     // Configure output power property (read-only)
 	CPropertyAction* pActPower = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnPower);
-    ret = CreateFloatProperty("Laser Power (Watts)", 0, true, pActPower);
+    ret = CreateFloatProperty("Laser Power (W)", 0, true, pActPower);
     if (ret != 0)
         return ret;
 
@@ -700,7 +700,7 @@ int SpectraPhysicsInsightDSMain::Initialize() {
     if (ret != 0)
         return ret;
 	CPropertyAction* pActTargetWavelength = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnTargetWavelength);
-    ret = CreateIntegerProperty("Target Wavelength", 800, false, pActTargetWavelength);
+    ret = CreateIntegerProperty("Target Wavelength (nm)", 800, false, pActTargetWavelength);
     if (ret != 0)
         return ret;
     int wave_min{}, wave_max{};
@@ -711,13 +711,13 @@ int SpectraPhysicsInsightDSMain::Initialize() {
     catch (std::exception&) {
         return DEVICE_ERR;
     }
-    ret = SetPropertyLimits("Wavelength", wave_min, wave_max);
+    ret = SetPropertyLimits("Target Wavelength (nm)", wave_min, wave_max);
     if (ret != 0)
         return ret;
 
     // Configure actual wavelength property
 	CPropertyAction* pActActualWavelength = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnActualWavelength);
-    ret = CreateIntegerProperty("Actual Wavelength", 800, true, pActActualWavelength);
+    ret = CreateIntegerProperty("Actual Wavelength (nm)", 800, true, pActActualWavelength);
     if (ret != 0)
         return ret;
 
