@@ -25,8 +25,8 @@ const char* g_DeviceNameMain = "InsightDS+ Main";
 const char* g_DeviceName1040 = "InsightDS+ 1040nm";
 const char* g_On = "On";
 const char* g_Off = "Off";
-const char* g_Yes = "Yes";
-const char* g_No = "No";
+const char* g_Standby = "Maintain laser emission";
+const char* g_Hibernate = "Turn off laser";
 
 MODULE_API void InitializeModuleData()
 {
@@ -69,7 +69,7 @@ MODULE_API void DeleteDevice(MM::Device* pDevice)
 // Implementation of MyNewDevice methods
 SpectraPhysicsInsightDS::SpectraPhysicsInsightDS() :
     port_("Undefined"),
-    watchdogDisabled_(false),
+    onClose_(g_Hibernate),
     initialized_(false),
     watchdogThread_(new WatchdogThread(*this))
 {
@@ -118,21 +118,21 @@ int SpectraPhysicsInsightDS::Initialize()
     }
 
     // Watchdog disable property - shouldn't be used very often
-    std::string watchdogProp = "DISABLE WATCHDOG TIMER";
+    std::string watchdogProp = "On Close";
 	CPropertyAction* pActWatchdog = new CPropertyAction (this, &SpectraPhysicsInsightDS::OnWatchdog);
-	ret = CreateStringProperty(watchdogProp.c_str(), g_No, false, pActWatchdog);
+	ret = CreateStringProperty(watchdogProp.c_str(), g_Hibernate, false, pActWatchdog);
     if (ret != 0)
         return ret;
-    ret = AddAllowedValue(watchdogProp.c_str(), g_No);
+    ret = AddAllowedValue(watchdogProp.c_str(), g_Hibernate);
     if (ret != 0)
         return ret;
-    ret = AddAllowedValue(watchdogProp.c_str(), g_Yes);
+    ret = AddAllowedValue(watchdogProp.c_str(), g_Standby);
     if (ret != 0)
         return ret;
     // (and initialize the watchdog timer)
-    ret = SetProperty(watchdogProp.c_str(), g_No);
-    if (ret != 0)
-        return ret;
+	ret = ExecuteCommand("TIM:WATC 3");
+	if (ret != 0)
+		return ret;
 
     // Configure pump laser property
 	CPropertyAction* pActPumpLaser = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnPumpLaser);
@@ -230,6 +230,21 @@ int SpectraPhysicsInsightDS::Shutdown()
             delete watchdogThread_;
             watchdogThread_ = nullptr;
         }
+
+        if (onClose_ == g_Standby) {
+            // Disable the watchdog timer
+            int	ret = ExecuteCommand("TIM:WATC 0");
+            if (ret != 0)
+                return ret;
+        }
+        else {
+            // Turn off the laser
+            int ret = SetProperty("Pump Laser", g_Off);
+            if (ret != 0)
+                return ret;
+            // TODO: Should we wait?
+        }
+
         initialized_ = false;
     }
     return DEVICE_OK;
@@ -346,17 +361,11 @@ int SpectraPhysicsInsightDS::OnWatchdog(MM::PropertyBase * pProp, MM::ActionType
 {
 	if (eAct == MM::BeforeGet)
 	{
-		pProp->Set(watchdogDisabled_.load() ? g_Yes : g_No);
+		pProp->Set(onClose_.c_str());
 	}
 	else if (eAct == MM::AfterSet)
 	{
-        std::string disabledStr;
-		pProp->Get(disabledStr);
-        watchdogDisabled_.store(disabledStr == g_Yes);
-
-        int	ret = ExecuteCommand(watchdogDisabled_.load() ? "TIM:WATC 0" : "TIM:WATC 3");
-		if (ret != 0)
-			return ret;
+		pProp->Get(onClose_);
 	}
 
 	return DEVICE_OK;
@@ -741,7 +750,12 @@ int SpectraPhysicsInsightDSMain::Shutdown()
 {
     if (initialized_)
     {
-        SetOpen(false);
+        if (parent_->onClose_ != g_Standby) {
+			int ret = SetOpen(false);
+            if (ret != 0)
+                return ret;
+            // TODO: Should we wait?
+        }
         initialized_ = false;
     }
     return DEVICE_OK;
@@ -889,7 +903,12 @@ int SpectraPhysicsInsightDS1040::Shutdown()
 {
     if (initialized_)
     {
-        SetOpen(false);
+        if (parent_->onClose_ != g_Standby) {
+			int ret = SetOpen(false);
+            if (ret != 0)
+                return ret;
+            // TODO: Should we wait?
+        }
         initialized_ = false;
     }
     return DEVICE_OK;
@@ -1007,12 +1026,9 @@ int WatchdogThread::svc() {
             }
         }
         // Just need to do something that sends a command
-        if (!device_.watchdogDisabled_.load()) {
-            device_.LogMessage("Spectra Insight Watchdog Thread: Pinging laser", true);
-            int state;
-            device_.LaserState(state);
-        }
-
+		device_.LogMessage("Spectra Insight Watchdog Thread: Pinging laser", true);
+		int state;
+		device_.LaserState(state);
     }
 
     return 0;

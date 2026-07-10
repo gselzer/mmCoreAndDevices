@@ -72,8 +72,8 @@ private:
 	// Device state
 	bool initialized_;
 	std::string port_;
-	std::atomic<bool> watchdogDisabled_;
 	std::string lastCommand_;
+	std::string onClose_;
 	std::chrono::steady_clock::time_point lastCommandTime_;
 	std::mutex serialMutex_;
 	WatchdogThread* watchdogThread_;
