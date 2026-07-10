@@ -202,7 +202,7 @@ int SpectraPhysicsInsightDS::Initialize()
 
     // Configure laser state property (read-only)
 	CPropertyAction* pActLaserState = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnLaserState);
-    ret = CreateIntegerProperty("Laser State", 0, true, pActLaserState);
+    ret = CreateStringProperty("Laser State", 0, true, pActLaserState);
     if (ret != 0)
         return ret;
 
@@ -501,6 +501,32 @@ int SpectraPhysicsInsightDS::OnLaserState(MM::PropertyBase * pProp, MM::ActionTy
         int ret = LaserState(state);
         if (ret != 0)
             return ret;
+        std::string strState{};
+        if (state < 25) {
+            strState = "Initializing";
+        }
+        else if (state == 25) {
+            strState = "Ready";
+        }
+        else if (25 < state && state < 50) {
+            strState = "Turning on and/or optimizing";
+        }
+        else if (state == 50) {
+            strState = "Running";
+        }
+        else if (50 < state && state < 60) {
+            strState = "Moving to Align mode";
+        }
+        else if (state == 60) {
+            strState = "Aligning";
+        }
+        else if (60 < state && state < 70) {
+            strState = "Exiting Align mode";
+        }
+        else if (70 <= state) {
+            strState = "Unknown state";
+        }
+        strState += " (" + std::to_string(state) + ")";
 		pProp->Set(std::to_string(state).c_str());
 	}
 	return DEVICE_OK;
