@@ -215,6 +215,114 @@ int SpectraPhysicsInsightDS::Initialize()
     if (ret != 0)
         return ret;
 
+    // Configure emission flag property (read-only)
+	CPropertyAction* pActEmission = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnEmission);
+    ret = CreateIntegerProperty("Emission", 0, true, pActEmission);
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("Emission", "0");
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("Emission", "1");
+    if (ret != 0)
+        return ret;
+
+    // Configure pusling flag property (read-only)
+	CPropertyAction* pActPulsing = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnPulsing);
+    ret = CreateIntegerProperty("Pulsing", 0, true, pActPulsing);
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("Pulsing", "0");
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("Pulsing", "1");
+    if (ret != 0)
+        return ret;
+
+    // Configure servo-on flag property (read-only)
+	CPropertyAction* pActServoOn = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnServoOn);
+    ret = CreateIntegerProperty("Servo On", 0, true, pActServoOn);
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("Servo On", "0");
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("Servo On", "1");
+    if (ret != 0)
+        return ret;
+
+    // Configure user interlock flag property (read-only)
+	CPropertyAction* pActUserInterlock = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnUserInterlock);
+    ret = CreateIntegerProperty("User Interlock", 0, true, pActUserInterlock);
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("User Interlock", "0");
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("User Interlock", "1");
+    if (ret != 0)
+        return ret;
+
+    // Configure Keyswitch interlock flag property (read-only)
+	CPropertyAction* pActKeyswitchInterlock = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnKeyswitchInterlock);
+    ret = CreateIntegerProperty("Keyswitch Interlock", 0, true, pActKeyswitchInterlock);
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("Keyswitch Interlock", "0");
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("Keyswitch Interlock", "1");
+    if (ret != 0)
+        return ret;
+
+    // Configure Power supply interlock flag property (read-only)
+	CPropertyAction* pActPowerSupplyInterlock = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnPowerSupplyInterlock);
+    ret = CreateIntegerProperty("Power supply Interlock", 0, true, pActPowerSupplyInterlock);
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("Power supply Interlock", "0");
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("Power supply Interlock", "1");
+    if (ret != 0)
+        return ret;
+
+    // Configure Internal interlock flag property (read-only)
+	CPropertyAction* pActInternalInterlock = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnInternalInterlock);
+    ret = CreateIntegerProperty("Internal Interlock", 0, true, pActInternalInterlock);
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("Internal Interlock", "0");
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("Internal Interlock", "1");
+    if (ret != 0)
+        return ret;
+
+    // Configure Warning flag property (read-only)
+	CPropertyAction* pActWarning = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnWarning);
+    ret = CreateIntegerProperty("Warning", 0, true, pActWarning);
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("Warning", "0");
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("Warning", "1");
+    if (ret != 0)
+        return ret;
+
+    // Configure Fault flag property (read-only)
+	CPropertyAction* pActFault = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnFault);
+    ret = CreateIntegerProperty("Fault", 0, true, pActFault);
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("Fault", "0");
+    if (ret != 0)
+        return ret;
+    ret = AddAllowedValue("Fault", "1");
+    if (ret != 0)
+        return ret;
+
     initialized_ = true;
 
 	// Start the watchdog thread. We Start it after setting initialized_ so Shutdown cleans it up.
@@ -540,6 +648,132 @@ int SpectraPhysicsInsightDS::OnLaserState(MM::PropertyBase * pProp, MM::ActionTy
         }
         strState += " (" + std::to_string(state) + ")";
 		pProp->Set(std::to_string(state).c_str());
+	}
+	return DEVICE_OK;
+}
+
+int SpectraPhysicsInsightDS::OnEmission(MM::PropertyBase * pProp, MM::ActionType eAct)
+{
+	if (eAct == MM::BeforeGet)
+	{
+        bool isEmitting{};
+        int ret = StatusBit(0, isEmitting);
+        if (ret != 0) {
+            return ret;
+        }
+		pProp->Set(isEmitting ? "1" : "0");
+	}
+	return DEVICE_OK;
+}
+
+int SpectraPhysicsInsightDS::OnPulsing(MM::PropertyBase * pProp, MM::ActionType eAct)
+{
+	if (eAct == MM::BeforeGet)
+	{
+        bool isPulsing{};
+        int ret = StatusBit(1, isPulsing);
+        if (ret != 0) {
+            return ret;
+        }
+		pProp->Set(isPulsing ? "1" : "0");
+	}
+	return DEVICE_OK;
+}
+
+int SpectraPhysicsInsightDS::OnServoOn(MM::PropertyBase * pProp, MM::ActionType eAct)
+{
+	if (eAct == MM::BeforeGet)
+	{
+        bool isServoOn{};
+        int ret = StatusBit(5, isServoOn);
+        if (ret != 0) {
+            return ret;
+        }
+		pProp->Set(isServoOn ? "1" : "0");
+	}
+	return DEVICE_OK;
+}
+
+int SpectraPhysicsInsightDS::OnUserInterlock(MM::PropertyBase * pProp, MM::ActionType eAct)
+{
+	if (eAct == MM::BeforeGet)
+	{
+        bool isUserInterlock{};
+        int ret = StatusBit(9, isUserInterlock);
+        if (ret != 0) {
+            return ret;
+        }
+		pProp->Set(isUserInterlock ? "1" : "0");
+	}
+	return DEVICE_OK;
+}
+
+int SpectraPhysicsInsightDS::OnKeyswitchInterlock(MM::PropertyBase * pProp, MM::ActionType eAct)
+{
+	if (eAct == MM::BeforeGet)
+	{
+        bool isKeyswitch{};
+        int ret = StatusBit(10, isKeyswitch);
+        if (ret != 0) {
+            return ret;
+        }
+		pProp->Set(isKeyswitch ? "1" : "0");
+	}
+	return DEVICE_OK;
+}
+
+int SpectraPhysicsInsightDS::OnPowerSupplyInterlock(MM::PropertyBase * pProp, MM::ActionType eAct)
+{
+	if (eAct == MM::BeforeGet)
+	{
+        bool isPowerSupply{};
+        int ret = StatusBit(11, isPowerSupply);
+        if (ret != 0) {
+            return ret;
+        }
+		pProp->Set(isPowerSupply ? "1" : "0");
+	}
+	return DEVICE_OK;
+}
+
+int SpectraPhysicsInsightDS::OnInternalInterlock(MM::PropertyBase * pProp, MM::ActionType eAct)
+{
+	if (eAct == MM::BeforeGet)
+	{
+        bool isInternal{};
+        int ret = StatusBit(12, isInternal);
+        if (ret != 0) {
+            return ret;
+        }
+		pProp->Set(isInternal ? "1" : "0");
+	}
+	return DEVICE_OK;
+}
+
+int SpectraPhysicsInsightDS::OnWarning(MM::PropertyBase * pProp, MM::ActionType eAct)
+{
+	if (eAct == MM::BeforeGet)
+	{
+        bool isWarning{};
+        int ret = StatusBit(14, isWarning);
+        if (ret != 0) {
+            return ret;
+        }
+		pProp->Set(isWarning ? "1" : "0");
+	}
+	return DEVICE_OK;
+}
+
+int SpectraPhysicsInsightDS::OnFault(MM::PropertyBase * pProp, MM::ActionType eAct)
+{
+	if (eAct == MM::BeforeGet)
+	{
+        bool isFault{};
+        int ret = StatusBit(15, isFault);
+        if (ret != 0) {
+            return ret;
+        }
+		pProp->Set(isFault ? "1" : "0");
 	}
 	return DEVICE_OK;
 }

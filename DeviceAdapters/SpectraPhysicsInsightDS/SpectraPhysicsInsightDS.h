@@ -67,6 +67,15 @@ public:
 	int OnPower(MM::PropertyBase* pProp, MM::ActionType eAct);
 	int OnHistoryBuffer(MM::PropertyBase* pProp, MM::ActionType eAct);
 	int OnLaserState(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnEmission(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnPulsing(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnServoOn(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnUserInterlock(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnKeyswitchInterlock(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnPowerSupplyInterlock(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnInternalInterlock(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnWarning(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnFault(MM::PropertyBase* pProp, MM::ActionType eAct);
 
 private:
 	// Device state
