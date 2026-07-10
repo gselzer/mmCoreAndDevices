@@ -103,7 +103,8 @@ public:
 	int Fire(double deltaT);
 
 	// Actions
-	int OnWavelength(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnTargetWavelength(MM::PropertyBase* pProp, MM::ActionType eAct);
+	int OnActualWavelength(MM::PropertyBase* pProp, MM::ActionType eAct);
 	int OnState(MM::PropertyBase* pProp, MM::ActionType eAct);
 private:
 	// Device state

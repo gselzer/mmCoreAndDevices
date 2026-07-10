@@ -664,7 +664,7 @@ int SpectraPhysicsInsightDSMain::Initialize() {
     if (!parent_)
         return ERR_NO_HUB;
 
-    // Configure wavelength property
+    // Configure target wavelength property
     std::string wave_min_str{}, wave_max_str{};
     int ret{};
     ret = parent_->ExecuteCommand("WAV:min?", wave_min_str);
@@ -673,8 +673,8 @@ int SpectraPhysicsInsightDSMain::Initialize() {
     ret = parent_->ExecuteCommand("WAV:max?", wave_max_str);
     if (ret != 0)
         return ret;
-	CPropertyAction* pActWavelength = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnWavelength);
-    ret = CreateIntegerProperty("Wavelength", 800, false, pActWavelength);
+	CPropertyAction* pActTargetWavelength = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnTargetWavelength);
+    ret = CreateIntegerProperty("Target Wavelength", 800, false, pActTargetWavelength);
     if (ret != 0)
         return ret;
     int wave_min{}, wave_max{};
@@ -686,6 +686,12 @@ int SpectraPhysicsInsightDSMain::Initialize() {
         return DEVICE_ERR;
     }
     ret = SetPropertyLimits("Wavelength", wave_min, wave_max);
+    if (ret != 0)
+        return ret;
+
+    // Configure actual wavelength property
+	CPropertyAction* pActActualWavelength = new CPropertyAction(this, &SpectraPhysicsInsightDSMain::OnActualWavelength);
+    ret = CreateIntegerProperty("Actual Wavelength", 800, true, pActActualWavelength);
     if (ret != 0)
         return ret;
 
@@ -753,12 +759,12 @@ int SpectraPhysicsInsightDSMain::Fire(double deltaT)
    return DEVICE_UNSUPPORTED_COMMAND;
 }
 
-int SpectraPhysicsInsightDSMain::OnWavelength(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsInsightDSMain::OnTargetWavelength(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
         std::string wavelength;
-        int ret = parent_->ExecuteCommand("READ:WAV?", wavelength);
+        int ret = parent_->ExecuteCommand("WAV?", wavelength);
         if (ret != 0)
             return ret;
 		pProp->Set(wavelength.c_str());
@@ -769,6 +775,20 @@ int SpectraPhysicsInsightDSMain::OnWavelength(MM::PropertyBase * pProp, MM::Acti
         pProp->Get(cmd);
         cmd = "WAV " + cmd;
         return parent_->ExecuteCommand(cmd);
+	}
+
+	return DEVICE_OK;
+}
+
+int SpectraPhysicsInsightDSMain::OnActualWavelength(MM::PropertyBase * pProp, MM::ActionType eAct)
+{
+	if (eAct == MM::BeforeGet)
+	{
+        std::string wavelength;
+        int ret = parent_->ExecuteCommand("READ:WAV?", wavelength);
+        if (ret != 0)
+            return ret;
+		pProp->Set(wavelength.c_str());
 	}
 
 	return DEVICE_OK;
