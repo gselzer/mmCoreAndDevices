@@ -116,6 +116,9 @@ int SpectraPhysicsInsightDS::Initialize()
         // *Waves hand* this is not the device you're looking for...
         return DEVICE_NOT_CONNECTED;
     }
+    else {
+        LogMessage("Spectra Insight: Controlling device with id \"" + id + "\"");
+    }
 
     // Watchdog disable property - shouldn't be used very often
     std::string watchdogProp = "On Close";
