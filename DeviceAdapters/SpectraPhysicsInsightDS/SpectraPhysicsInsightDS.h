@@ -46,9 +46,8 @@ private:
     SpectraPhysicsInsightDS& device_;
     std::mutex stopMutex_;
     std::condition_variable timerCV_;
-    std::atomic<bool> stop_;
+    bool stop_;
     std::chrono::steady_clock::duration interval_;
-
 };
 
 class SpectraPhysicsInsightDS : public HubBase<SpectraPhysicsInsightDS>

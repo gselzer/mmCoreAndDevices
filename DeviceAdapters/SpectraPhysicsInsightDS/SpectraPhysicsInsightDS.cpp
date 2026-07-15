@@ -1223,7 +1223,7 @@ WatchdogThread::~WatchdogThread() {
 
 void WatchdogThread::Start()
 {
-    stop_.store(false);
+    stop_ = false;
     activate();
 }
 
@@ -1235,14 +1235,14 @@ void WatchdogThread::Stop()
 {
     {
         std::unique_lock<std::mutex> lock(stopMutex_);
-        stop_.store(true);
+        stop_ = true;
     }
     timerCV_.notify_all();
     wait();
 }
 
 int WatchdogThread::svc() {
-    while (!stop_)
+    while (true)
     {
         {
             std::unique_lock<std::mutex> lock(stopMutex_);
@@ -1250,8 +1250,8 @@ int WatchdogThread::svc() {
             // (1) stop_ is true (Stop() sets this and notifies the CV to wake us early)
             // (2) The duration interval_ elapses
             // The predicate handles spurious wakeups by re-sleeping if stop_ is still false.
-            timerCV_.wait_for(lock, interval_, [this] { return stop_.load(); });
-            if (stop_.load())
+            timerCV_.wait_for(lock, interval_, [this] { return stop_; });
+            if (stop_)
             {
                 device_.LogMessage("Spectra Insight Watchdog Thread: Stop requested, exiting", true);
                 break;
