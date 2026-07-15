@@ -71,7 +71,7 @@ SpectraPhysicsInsightDS::SpectraPhysicsInsightDS() :
     port_("Undefined"),
     onClose_(g_Hibernate),
     initialized_(false),
-    watchdogThread_(new WatchdogThread(*this))
+    watchdogThread_(*this)
 {
     InitializeDefaultErrorMessages();
     SetErrorText(ERR_PORT_CHANGE_FORBIDDEN, "Cannot change port after initialization");
@@ -325,7 +325,7 @@ int SpectraPhysicsInsightDS::Initialize()
 
 	// Start the watchdog thread. We Start it after setting initialized_ so Shutdown cleans it up.
     LogMessage("Starting watchdog thread...");
-	watchdogThread_->Start();
+	watchdogThread_.Start();
     LogMessage("Started watchdog thread");
 
     return DEVICE_OK;
@@ -335,12 +335,7 @@ int SpectraPhysicsInsightDS::Shutdown()
 {
     if (initialized_)
     {
-        if (watchdogThread_)
-        {
-            watchdogThread_->Stop();
-            delete watchdogThread_;
-            watchdogThread_ = nullptr;
-        }
+		watchdogThread_.Stop();
 
         if (onClose_ == g_Standby) {
             // Disable the watchdog timer

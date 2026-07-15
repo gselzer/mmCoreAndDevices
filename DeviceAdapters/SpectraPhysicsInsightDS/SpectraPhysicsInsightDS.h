@@ -31,6 +31,26 @@
 #define ERR_PUMP_LASER_TURNING_ON       10004
 #define ERR_NO_HUB				        10005
 
+// Forward declaration
+class SpectraPhysicsInsightDS;
+
+class WatchdogThread : public MMDeviceThreadBase
+{
+public:
+    WatchdogThread(SpectraPhysicsInsightDS& device);
+    ~WatchdogThread();
+    int svc() override;
+    void Start();
+    void Stop();
+private:
+    SpectraPhysicsInsightDS& device_;
+    std::mutex stopMutex_;
+    std::condition_variable timerCV_;
+    std::atomic<bool> stop_;
+    std::chrono::steady_clock::duration interval_;
+
+};
+
 class SpectraPhysicsInsightDS : public HubBase<SpectraPhysicsInsightDS>
 {
     friend class WatchdogThread;
@@ -84,7 +104,7 @@ private:
 	std::string onClose_;
 	std::chrono::steady_clock::time_point lastCommandTime_;
 	std::mutex serialMutex_;
-	WatchdogThread* watchdogThread_;
+	WatchdogThread watchdogThread_;
 
 	int ExecuteCommand(const std::string& cmd);
 	int ExecuteCommand(const std::string& cmd, std::string& answer);
@@ -144,21 +164,3 @@ private:
 	bool initialized_;
 	SpectraPhysicsInsightDS* parent_;
 };
-
-class WatchdogThread : public MMDeviceThreadBase
-{
-public:
-    WatchdogThread(SpectraPhysicsInsightDS& device);
-    ~WatchdogThread();
-    int svc() override;
-    void Start();
-    void Stop();
-private:
-    SpectraPhysicsInsightDS& device_;
-    std::mutex stopMutex_;
-    std::condition_variable timerCV_;
-    std::atomic<bool> stop_;
-    std::chrono::steady_clock::duration interval_;
-
-};
-
