@@ -149,7 +149,7 @@ int SpectraPhysicsInsightDS::Initialize()
 
     // Configure humidity property (read-only)
 	CPropertyAction* pActHumidity = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnHumidity);
-    ret = CreateIntegerProperty("Relative Humidity (%)", 0, true, pActHumidity);
+    ret = CreateFloatProperty("Relative Humidity (%)", 0.0, true, pActHumidity);
     if (ret != 0)
         return ret;
 
