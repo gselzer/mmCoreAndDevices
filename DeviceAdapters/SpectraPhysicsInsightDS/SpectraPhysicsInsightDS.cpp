@@ -203,7 +203,7 @@ int SpectraPhysicsInsightDS::Initialize()
 
     // Configure laser state property (read-only)
 	CPropertyAction* pActLaserState = new CPropertyAction(this, &SpectraPhysicsInsightDS::OnLaserState);
-    ret = CreateStringProperty("Laser State", 0, true, pActLaserState);
+    ret = CreateStringProperty("Laser State", "", true, pActLaserState);
     if (ret != 0)
         return ret;
 
