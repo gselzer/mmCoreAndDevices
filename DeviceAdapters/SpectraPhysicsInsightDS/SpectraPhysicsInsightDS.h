@@ -26,11 +26,10 @@
 // Error codes
 //
 #define ERR_PORT_CHANGE_FORBIDDEN       10001
-#define ERR_WATCHDOG_CHANGE_FORBIDDEN   10002
-#define ERR_PUMP_LASER_NOT_WARM         10003
-#define ERR_WAVELENGTH_CHANGING         10004
-#define ERR_PUMP_LASER_TURNING_ON       10005
-#define ERR_NO_HUB				        10006
+#define ERR_PUMP_LASER_NOT_WARM         10002
+#define ERR_WAVELENGTH_CHANGING         10003
+#define ERR_PUMP_LASER_TURNING_ON       10004
+#define ERR_NO_HUB				        10005
 
 class SpectraPhysicsInsightDS : public HubBase<SpectraPhysicsInsightDS>
 {
