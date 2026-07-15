@@ -647,7 +647,7 @@ int SpectraPhysicsInsightDS::OnLaserState(MM::PropertyBase * pProp, MM::ActionTy
             strState = "Unknown state";
         }
         strState += " (" + std::to_string(state) + ")";
-		pProp->Set(std::to_string(state).c_str());
+		pProp->Set(strState.c_str());
 	}
 	return DEVICE_OK;
 }
