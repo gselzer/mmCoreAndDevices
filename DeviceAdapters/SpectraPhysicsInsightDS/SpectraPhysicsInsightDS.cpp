@@ -324,7 +324,9 @@ int SpectraPhysicsInsightDS::Initialize()
     initialized_ = true;
 
 	// Start the watchdog thread. We Start it after setting initialized_ so Shutdown cleans it up.
+    LogMessage("Starting watchdog thread...");
 	watchdogThread_->Start();
+    LogMessage("Started watchdog thread");
 
     return DEVICE_OK;
 }
