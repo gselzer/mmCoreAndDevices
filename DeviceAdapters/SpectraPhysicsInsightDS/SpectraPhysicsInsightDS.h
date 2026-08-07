@@ -1,4 +1,4 @@
-// Micro-Manager Device Adapter for Spectra-Physics InSight DS+ Laser System
+// Micro-Manager Device Adapter for Spectra-Physics Ultrafast Laser Systems
 // Author: Gabriel Selzer
 //
 // Copyright 2026 Board of Regents of the University of Wisconsin System
@@ -32,32 +32,32 @@
 #define ERR_NO_HUB				        10005
 
 // Forward declaration
-class SpectraPhysicsInsightDS;
+class SpectraPhysicsInsight;
 
 class WatchdogThread : public MMDeviceThreadBase
 {
 public:
-    WatchdogThread(SpectraPhysicsInsightDS& device);
+    WatchdogThread(SpectraPhysicsInsight& device);
     ~WatchdogThread();
     int svc() override;
     void Start();
     void Stop();
 private:
-    SpectraPhysicsInsightDS& device_;
+    SpectraPhysicsInsight& device_;
     std::mutex stopMutex_;
     std::condition_variable timerCV_;
     bool stop_;
     std::chrono::steady_clock::duration interval_;
 };
 
-class SpectraPhysicsInsightDS : public HubBase<SpectraPhysicsInsightDS>
+class SpectraPhysicsInsight : public HubBase<SpectraPhysicsInsight>
 {
     friend class WatchdogThread;
-    friend class SpectraPhysicsInsightDSMain;
-    friend class SpectraPhysicsInsightDS1040;
+    friend class SpectraPhysicsInsightMain;
+    friend class SpectraPhysicsInsight1040;
 public:
-	SpectraPhysicsInsightDS();
-	~SpectraPhysicsInsightDS();
+	SpectraPhysicsInsight();
+	~SpectraPhysicsInsight();
 
 	// MMDevice API
 	int Initialize();
@@ -112,11 +112,11 @@ private:
 	int LaserState(int& state);
 };
 
-class SpectraPhysicsInsightDSMain : public CShutterBase<SpectraPhysicsInsightDSMain>
+class SpectraPhysicsInsightMain : public CShutterBase<SpectraPhysicsInsightMain>
 {
 public:
-    SpectraPhysicsInsightDSMain();
-    ~SpectraPhysicsInsightDSMain();
+    SpectraPhysicsInsightMain();
+    ~SpectraPhysicsInsightMain();
 
     // MMDevice API
     int Initialize();
@@ -136,14 +136,14 @@ public:
 private:
 	// Device state
 	bool initialized_;
-	SpectraPhysicsInsightDS* parent_;
+	SpectraPhysicsInsight* parent_;
 };
 
-class SpectraPhysicsInsightDS1040 : public CShutterBase<SpectraPhysicsInsightDS1040>
+class SpectraPhysicsInsight1040 : public CShutterBase<SpectraPhysicsInsight1040>
 {
 public:
-    SpectraPhysicsInsightDS1040();
-    ~SpectraPhysicsInsightDS1040();
+    SpectraPhysicsInsight1040();
+    ~SpectraPhysicsInsight1040();
 
     // MMDevice API
     int Initialize();
@@ -161,5 +161,5 @@ public:
 private:
 	// Device state
 	bool initialized_;
-	SpectraPhysicsInsightDS* parent_;
+	SpectraPhysicsInsight* parent_;
 };
