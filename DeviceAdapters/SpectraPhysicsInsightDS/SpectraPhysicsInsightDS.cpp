@@ -600,6 +600,8 @@ int SpectraPhysicsInsightDS::OnHistoryBuffer(MM::PropertyBase * pProp, MM::Actio
 	{
         std::string power;
         // NOTE that the manual sometimes uses READ:HIS?. It seems that is a typo.
+        // This comes from previous laser APIs, which had both raw bytes (READ:HIS?) and
+        // ASCII (READ:AHIS?) versions.
         int ret = ExecuteCommand("READ:AHIS?", power);
         if (ret != 0)
             return ret;
