@@ -13,16 +13,17 @@
 // IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY
 // DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES.
 
-#include "SpectraPhysicsInsightDS.h"
+#include "SpectraPhysicsLasers.h"
 
 #include "ModuleInterface.h"
 
 #include <chrono>
 #include <cstring>
 
-const char* g_DeviceNameHub = "Insight";
-const char* g_DeviceNameMain = "Insight Main";
-const char* g_DeviceName1040 = "Insight 1040nm";
+const char* g_DeviceNameHub = "Spectra-Physics Laser";
+const char* g_DeviceNameShutter = "Spectra-Physics Main Shutter";
+const char* g_DeviceNameInsight1040 = "Spectra-Physics Insight 1040nm Shutter";
+
 const char* g_On = "On";
 const char* g_Off = "Off";
 const char* g_Standby = "Maintain laser emission";
@@ -30,9 +31,9 @@ const char* g_Hibernate = "Turn off laser";
 
 MODULE_API void InitializeModuleData()
 {
-    RegisterDevice(g_DeviceNameHub, MM::HubDevice, "Spectra-Physics InSight Laser System");
-    RegisterDevice(g_DeviceNameMain, MM::ShutterDevice, "Spectra-Physics InSight Laser System Main Shutter");
-    RegisterDevice(g_DeviceName1040, MM::ShutterDevice, "Spectra-Physics InSight Laser System 1040nm Shutter");
+    RegisterDevice(g_DeviceNameHub, MM::HubDevice, "Spectra-Physics Ultrafast Laser System");
+    RegisterDevice(g_DeviceNameShutter, MM::ShutterDevice, "Spectra-Physics Ultrafast Laser System Main Shutter");
+    RegisterDevice(g_DeviceNameInsight1040, MM::ShutterDevice, "Spectra-Physics InSight Laser System 1040nm Shutter");
 }
 
 MODULE_API MM::Device* CreateDevice(const char* deviceName)
@@ -42,15 +43,15 @@ MODULE_API MM::Device* CreateDevice(const char* deviceName)
 
     if (std::strcmp(deviceName, g_DeviceNameHub) == 0)
     {
-        return new SpectraPhysicsInsight();
+        return new SpectraPhysicsHub();
     }
 
-    if (std::strcmp(deviceName, g_DeviceNameMain) == 0)
+    if (std::strcmp(deviceName, g_DeviceNameShutter) == 0)
     {
-        return new SpectraPhysicsInsightMain();
+        return new SpectraPhysicsMain();
     }
 
-    if (std::strcmp(deviceName, g_DeviceName1040) == 0)
+    if (std::strcmp(deviceName, g_DeviceNameInsight1040) == 0)
     {
         return new SpectraPhysicsInsight1040();
     }
@@ -67,7 +68,7 @@ MODULE_API void DeleteDevice(MM::Device* pDevice)
 ////////////////////////////////////////////////////////////////////////////////////
 
 // Implementation of MyNewDevice methods
-SpectraPhysicsInsight::SpectraPhysicsInsight() :
+SpectraPhysicsHub::SpectraPhysicsHub() :
     port_("Undefined"),
     onClose_(g_Hibernate),
     initialized_(false),
@@ -81,22 +82,22 @@ SpectraPhysicsInsight::SpectraPhysicsInsight() :
     SetErrorText(ERR_NO_HUB, "Cannot obtain the SpectraPhysics MMCore Hub device");
 
     // COM port property
-	CPropertyAction* pActPort = new CPropertyAction (this, &SpectraPhysicsInsight::OnPort);
+	CPropertyAction* pActPort = new CPropertyAction (this, &SpectraPhysicsHub::OnPort);
 	CreateStringProperty(MM::g_Keyword_Port, "Undefined", false, pActPort, true);
 
 }
 
-SpectraPhysicsInsight::~SpectraPhysicsInsight()
+SpectraPhysicsHub::~SpectraPhysicsHub()
 {
     Shutdown();
 }
 
-void SpectraPhysicsInsight::GetName(char* name) const
+void SpectraPhysicsHub::GetName(char* name) const
 {
     CDeviceUtils::CopyLimitedString(name, g_DeviceNameHub);
 }
 
-int SpectraPhysicsInsight::Initialize()
+int SpectraPhysicsHub::Initialize()
 {
     int ret{};
 
@@ -110,19 +111,25 @@ int SpectraPhysicsInsight::Initialize()
     ret = ExecuteCommand("*IDN?", id);
     if (ret != 0)
         return ret;
-    // TODO: If we want to support DeepSee commands, we could enable them iff "Insight DeepSee" is
-    // present in this string.
-    if (id.rfind("Spectra-Physics, InSight", 0) != 0) {
+    if (id.rfind("Spectra-Physics, InSight", 0) == 0) {
+        // TODO: If we want to support DeepSee commands, we could enable them iff "Insight DeepSee" is
+        // present in this string.
+        LogMessage("Spectra Insight: Controlling device with id \"" + id + "\"");
+        model_ = INSIGHT;
+    }
+    else if (id.rfind("Spectra-Physics,MaiTai", 0) == 0) {
+        // TODO: MaiTai's id string doesn't differ for DeepSee, according to the manuals...
+        LogMessage("Spectra MaiTai: Controlling device with id \"" + id + "\"");
+        model_ = MAITAI;
+    }
+    else {
         // *Waves hand* this is not the device you're looking for...
         return DEVICE_NOT_CONNECTED;
     }
-    else {
-        LogMessage("Spectra Insight: Controlling device with id \"" + id + "\"");
-    }
 
-    // Watchdog disable property - shouldn't be used very often
+    // Configure on close property
     std::string watchdogProp = "On Close";
-	CPropertyAction* pActWatchdog = new CPropertyAction (this, &SpectraPhysicsInsight::OnWatchdog);
+	CPropertyAction* pActWatchdog = new CPropertyAction (this, &SpectraPhysicsHub::OnWatchdog);
 	ret = CreateStringProperty(watchdogProp.c_str(), g_Hibernate, false, pActWatchdog);
     if (ret != 0)
         return ret;
@@ -138,7 +145,7 @@ int SpectraPhysicsInsight::Initialize()
 		return ret;
 
     // Configure pump laser property
-	CPropertyAction* pActPumpLaser = new CPropertyAction(this, &SpectraPhysicsInsight::OnPumpLaser);
+	CPropertyAction* pActPumpLaser = new CPropertyAction(this, &SpectraPhysicsHub::OnPumpLaser);
     ret = CreateStringProperty("Pump Laser", g_Off, false, pActPumpLaser);
     if (ret != 0)
         return ret;
@@ -150,73 +157,49 @@ int SpectraPhysicsInsight::Initialize()
         return ret;
 
     // Configure humidity property (read-only)
-	CPropertyAction* pActHumidity = new CPropertyAction(this, &SpectraPhysicsInsight::OnHumidity);
+	CPropertyAction* pActHumidity = new CPropertyAction(this, &SpectraPhysicsHub::OnHumidity);
     ret = CreateFloatProperty("Relative Humidity (%)", 0.0, true, pActHumidity);
     if (ret != 0)
         return ret;
 
     // Configure warmup percentage property (read-only)
-	CPropertyAction* pActWarmup = new CPropertyAction(this, &SpectraPhysicsInsight::OnWarmup);
+	CPropertyAction* pActWarmup = new CPropertyAction(this, &SpectraPhysicsHub::OnWarmup);
     ret = CreateIntegerProperty("Warmup Percentage (%)", 0, true, pActWarmup);
     if (ret != 0)
         return ret;
 
     // Configure diode1 current property (read-only)
-	CPropertyAction* pActDiode1Current = new CPropertyAction(this, &SpectraPhysicsInsight::OnDiode1Current);
+	CPropertyAction* pActDiode1Current = new CPropertyAction(this, &SpectraPhysicsHub::OnDiode1Current);
     ret = CreateFloatProperty("Diode 1 Current (A)", 0, true, pActDiode1Current);
     if (ret != 0)
         return ret;
 
-    // Configure diode2 current property (read-only)
-	CPropertyAction* pActDiode2Current = new CPropertyAction(this, &SpectraPhysicsInsight::OnDiode2Current);
-    ret = CreateFloatProperty("Diode 2 Current (A)", 0, true, pActDiode2Current);
-    if (ret != 0)
-        return ret;
-
     // Configure diode1 temperature property (read-only)
-	CPropertyAction* pActDiode1Temp = new CPropertyAction(this, &SpectraPhysicsInsight::OnDiode1Temp);
+	CPropertyAction* pActDiode1Temp = new CPropertyAction(this, &SpectraPhysicsHub::OnDiode1Temp);
     ret = CreateFloatProperty("Diode 1 Temperature (C)", 0, true, pActDiode1Temp);
     if (ret != 0)
         return ret;
 
-    // Configure diode2 temperature property (read-only)
-	CPropertyAction* pActDiode2Temp = new CPropertyAction(this, &SpectraPhysicsInsight::OnDiode2Temp);
-    ret = CreateFloatProperty("Diode 2 Temperature (C)", 0, true, pActDiode2Temp);
-    if (ret != 0)
-        return ret;
-
-    // Configure diode1 hours property (read-only)
-	CPropertyAction* pActDiode1Hours = new CPropertyAction(this, &SpectraPhysicsInsight::OnDiode1Hours);
-    ret = CreateFloatProperty("Diode 1 Accumulated Hours", 0, true, pActDiode1Hours);
-    if (ret != 0)
-        return ret;
-
-    // Configure diode2 hours property (read-only)
-	CPropertyAction* pActDiode2Hours = new CPropertyAction(this, &SpectraPhysicsInsight::OnDiode2Hours);
-    ret = CreateFloatProperty("Diode 2 Accumulated Hours", 0, true, pActDiode2Hours);
-    if (ret != 0)
-        return ret;
-
     // Configure output power property (read-only)
-	CPropertyAction* pActPower = new CPropertyAction(this, &SpectraPhysicsInsight::OnPower);
+	CPropertyAction* pActPower = new CPropertyAction(this, &SpectraPhysicsHub::OnPower);
     ret = CreateFloatProperty("Laser Power (W)", 0, true, pActPower);
     if (ret != 0)
         return ret;
 
     // Configure laser state property (read-only)
-	CPropertyAction* pActLaserState = new CPropertyAction(this, &SpectraPhysicsInsight::OnLaserState);
+	CPropertyAction* pActLaserState = new CPropertyAction(this, &SpectraPhysicsHub::OnLaserState);
     ret = CreateStringProperty("Laser State", "", true, pActLaserState);
     if (ret != 0)
         return ret;
 
     // Configure history buffer property (read-only)
-	CPropertyAction* pActHistoryBuffer = new CPropertyAction(this, &SpectraPhysicsInsight::OnHistoryBuffer);
+	CPropertyAction* pActHistoryBuffer = new CPropertyAction(this, &SpectraPhysicsHub::OnHistoryBuffer);
     ret = CreateStringProperty("Status Code Buffer", "", true, pActHistoryBuffer);
     if (ret != 0)
         return ret;
 
     // Configure emission flag property (read-only)
-	CPropertyAction* pActEmission = new CPropertyAction(this, &SpectraPhysicsInsight::OnEmission);
+	CPropertyAction* pActEmission = new CPropertyAction(this, &SpectraPhysicsHub::OnEmission);
     ret = CreateIntegerProperty("Emission", 0, true, pActEmission);
     if (ret != 0)
         return ret;
@@ -228,7 +211,7 @@ int SpectraPhysicsInsight::Initialize()
         return ret;
 
     // Configure pusling flag property (read-only)
-	CPropertyAction* pActPulsing = new CPropertyAction(this, &SpectraPhysicsInsight::OnPulsing);
+	CPropertyAction* pActPulsing = new CPropertyAction(this, &SpectraPhysicsHub::OnPulsing);
     ret = CreateIntegerProperty("Pulsing", 0, true, pActPulsing);
     if (ret != 0)
         return ret;
@@ -240,7 +223,7 @@ int SpectraPhysicsInsight::Initialize()
         return ret;
 
     // Configure servo-on flag property (read-only)
-	CPropertyAction* pActServoOn = new CPropertyAction(this, &SpectraPhysicsInsight::OnServoOn);
+	CPropertyAction* pActServoOn = new CPropertyAction(this, &SpectraPhysicsHub::OnServoOn);
     ret = CreateIntegerProperty("Servo On", 0, true, pActServoOn);
     if (ret != 0)
         return ret;
@@ -251,56 +234,8 @@ int SpectraPhysicsInsight::Initialize()
     if (ret != 0)
         return ret;
 
-    // Configure user interlock flag property (read-only)
-	CPropertyAction* pActUserInterlock = new CPropertyAction(this, &SpectraPhysicsInsight::OnUserInterlock);
-    ret = CreateIntegerProperty("User Interlock", 0, true, pActUserInterlock);
-    if (ret != 0)
-        return ret;
-    ret = AddAllowedValue("User Interlock", "0");
-    if (ret != 0)
-        return ret;
-    ret = AddAllowedValue("User Interlock", "1");
-    if (ret != 0)
-        return ret;
-
-    // Configure Keyswitch interlock flag property (read-only)
-	CPropertyAction* pActKeyswitchInterlock = new CPropertyAction(this, &SpectraPhysicsInsight::OnKeyswitchInterlock);
-    ret = CreateIntegerProperty("Keyswitch Interlock", 0, true, pActKeyswitchInterlock);
-    if (ret != 0)
-        return ret;
-    ret = AddAllowedValue("Keyswitch Interlock", "0");
-    if (ret != 0)
-        return ret;
-    ret = AddAllowedValue("Keyswitch Interlock", "1");
-    if (ret != 0)
-        return ret;
-
-    // Configure Power supply interlock flag property (read-only)
-	CPropertyAction* pActPowerSupplyInterlock = new CPropertyAction(this, &SpectraPhysicsInsight::OnPowerSupplyInterlock);
-    ret = CreateIntegerProperty("Power supply Interlock", 0, true, pActPowerSupplyInterlock);
-    if (ret != 0)
-        return ret;
-    ret = AddAllowedValue("Power supply Interlock", "0");
-    if (ret != 0)
-        return ret;
-    ret = AddAllowedValue("Power supply Interlock", "1");
-    if (ret != 0)
-        return ret;
-
-    // Configure Internal interlock flag property (read-only)
-	CPropertyAction* pActInternalInterlock = new CPropertyAction(this, &SpectraPhysicsInsight::OnInternalInterlock);
-    ret = CreateIntegerProperty("Internal Interlock", 0, true, pActInternalInterlock);
-    if (ret != 0)
-        return ret;
-    ret = AddAllowedValue("Internal Interlock", "0");
-    if (ret != 0)
-        return ret;
-    ret = AddAllowedValue("Internal Interlock", "1");
-    if (ret != 0)
-        return ret;
-
     // Configure Warning flag property (read-only)
-	CPropertyAction* pActWarning = new CPropertyAction(this, &SpectraPhysicsInsight::OnWarning);
+	CPropertyAction* pActWarning = new CPropertyAction(this, &SpectraPhysicsHub::OnWarning);
     ret = CreateIntegerProperty("Warning", 0, true, pActWarning);
     if (ret != 0)
         return ret;
@@ -312,7 +247,7 @@ int SpectraPhysicsInsight::Initialize()
         return ret;
 
     // Configure Fault flag property (read-only)
-	CPropertyAction* pActFault = new CPropertyAction(this, &SpectraPhysicsInsight::OnFault);
+	CPropertyAction* pActFault = new CPropertyAction(this, &SpectraPhysicsHub::OnFault);
     ret = CreateIntegerProperty("Fault", 0, true, pActFault);
     if (ret != 0)
         return ret;
@@ -322,6 +257,81 @@ int SpectraPhysicsInsight::Initialize()
     ret = AddAllowedValue("Fault", "1");
     if (ret != 0)
         return ret;
+
+    // InSight-specific parameters
+    if (model_ == INSIGHT) {
+		// Configure diode2 current property (read-only)
+		CPropertyAction* pActDiode2Current = new CPropertyAction(this, &SpectraPhysicsHub::OnDiode2Current);
+		ret = CreateFloatProperty("Diode 2 Current (A)", 0, true, pActDiode2Current);
+		if (ret != 0)
+			return ret;
+
+		// Configure diode2 temperature property (read-only)
+		CPropertyAction* pActDiode2Temp = new CPropertyAction(this, &SpectraPhysicsHub::OnDiode2Temp);
+		ret = CreateFloatProperty("Diode 2 Temperature (C)", 0, true, pActDiode2Temp);
+		if (ret != 0)
+			return ret;
+
+		// Configure diode1 hours property (read-only)
+		CPropertyAction* pActDiode1Hours = new CPropertyAction(this, &SpectraPhysicsHub::OnDiode1Hours);
+		ret = CreateFloatProperty("Diode 1 Accumulated Hours", 0, true, pActDiode1Hours);
+		if (ret != 0)
+			return ret;
+
+		// Configure diode2 hours property (read-only)
+		CPropertyAction* pActDiode2Hours = new CPropertyAction(this, &SpectraPhysicsHub::OnDiode2Hours);
+		ret = CreateFloatProperty("Diode 2 Accumulated Hours", 0, true, pActDiode2Hours);
+		if (ret != 0)
+			return ret;
+
+		// Configure user interlock flag property (read-only)
+		CPropertyAction* pActUserInterlock = new CPropertyAction(this, &SpectraPhysicsHub::OnUserInterlock);
+		ret = CreateIntegerProperty("User Interlock", 0, true, pActUserInterlock);
+		if (ret != 0)
+			return ret;
+		ret = AddAllowedValue("User Interlock", "0");
+		if (ret != 0)
+			return ret;
+		ret = AddAllowedValue("User Interlock", "1");
+		if (ret != 0)
+			return ret;
+
+		// Configure Keyswitch interlock flag property (read-only)
+		CPropertyAction* pActKeyswitchInterlock = new CPropertyAction(this, &SpectraPhysicsHub::OnKeyswitchInterlock);
+		ret = CreateIntegerProperty("Keyswitch Interlock", 0, true, pActKeyswitchInterlock);
+		if (ret != 0)
+			return ret;
+		ret = AddAllowedValue("Keyswitch Interlock", "0");
+		if (ret != 0)
+			return ret;
+		ret = AddAllowedValue("Keyswitch Interlock", "1");
+		if (ret != 0)
+			return ret;
+
+		// Configure Power supply interlock flag property (read-only)
+		CPropertyAction* pActPowerSupplyInterlock = new CPropertyAction(this, &SpectraPhysicsHub::OnPowerSupplyInterlock);
+		ret = CreateIntegerProperty("Power supply Interlock", 0, true, pActPowerSupplyInterlock);
+		if (ret != 0)
+			return ret;
+		ret = AddAllowedValue("Power supply Interlock", "0");
+		if (ret != 0)
+			return ret;
+		ret = AddAllowedValue("Power supply Interlock", "1");
+		if (ret != 0)
+			return ret;
+
+		// Configure Internal interlock flag property (read-only)
+		CPropertyAction* pActInternalInterlock = new CPropertyAction(this, &SpectraPhysicsHub::OnInternalInterlock);
+		ret = CreateIntegerProperty("Internal Interlock", 0, true, pActInternalInterlock);
+		if (ret != 0)
+			return ret;
+		ret = AddAllowedValue("Internal Interlock", "0");
+		if (ret != 0)
+			return ret;
+		ret = AddAllowedValue("Internal Interlock", "1");
+		if (ret != 0)
+			return ret;
+    }
 
     initialized_ = true;
 
@@ -333,7 +343,7 @@ int SpectraPhysicsInsight::Initialize()
     return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::Shutdown()
+int SpectraPhysicsHub::Shutdown()
 {
     if (initialized_)
     {
@@ -358,94 +368,107 @@ int SpectraPhysicsInsight::Shutdown()
     return DEVICE_OK;
 }
 
-bool SpectraPhysicsInsight::Busy()
+bool SpectraPhysicsHub::Busy()
 {
-    if (lastCommand_ == "ON")
-    {
-        int state{};
-        int ret = LaserState(state);
-        if (ret != 0)
-            return false;
-        return state != 50;
+    if (model_ == MAITAI) {
+        bool isBusy{};
+        int ret = StatusBit(6, isBusy);
+        if (ret != 0) {
+            return ret;
+        }
+        return isBusy;
     }
-    else if (lastCommand_.rfind("WAV ", 0) == 0) {
-        int state{};
-        int ret = LaserState(state);
-        if (ret != 0)
-            return false;
-        return state != 25;
-    }
-    else if (lastCommand_ == "SHUT 1")
+    else if (model_ == INSIGHT)
     {
-        // From the manual: "it is normal for the system to return 0 for approximately 1 second
-        // after issuing the SHUTter 1 command"
-        std::chrono::duration elapsed = std::chrono::steady_clock::now() - lastCommandTime_;
-        if (elapsed < std::chrono::seconds(1))
-            return true;
-        // Now return busy until the Main Status Bit is True
-        bool open;
-        int ret = StatusBit(2, open);
-        if (ret != 0)
-            return false;
-        return !open;
-    }
-    else if (lastCommand_ == "SHUT 0")
-    {
-        // NOTE: The manual doesn't explicitly suggest that we need to wait for 1 second here.
-        // But that could be an oversight in the manual.
+		if (lastCommand_ == "ON")
+		{
+			int state{};
+			int ret = LaserState(state);
+			if (ret != 0)
+				return false;
+			return state != 50;
+		}
+		else if (lastCommand_.rfind("WAV ", 0) == 0) {
+			int state{};
+			int ret = LaserState(state);
+			if (ret != 0)
+				return false;
+			return state != 25;
+		}
+		else if (lastCommand_ == "SHUT 1")
+		{
+			// From the manual: "it is normal for the system to return 0 for approximately 1 second
+			// after issuing the SHUTter 1 command"
+			std::chrono::duration elapsed = std::chrono::steady_clock::now() - lastCommandTime_;
+			if (elapsed < std::chrono::seconds(1))
+				return true;
+			// Now return busy until the Main Status Bit is True
+			bool open;
+			int ret = StatusBit(2, open);
+			if (ret != 0)
+				return false;
+			return !open;
+		}
+		else if (lastCommand_ == "SHUT 0")
+		{
+			// NOTE: The manual doesn't explicitly suggest that we need to wait for 1 second here.
+			// But that could be an oversight in the manual.
 
-        // Return busy until the Main Shutter Status Bit is False
-        bool open;
-        int ret = StatusBit(2, open);
-        if (ret != 0)
-            return false;
-        return open;
-    }
-    else if (lastCommand_ == "IRSHUT 1")
-    {
-        // From the manual: "it is normal for the system to return 0 for approximately 1 second
-        // after issuing the IRSHUTter 1 command"
-        std::chrono::duration elapsed = std::chrono::steady_clock::now() - lastCommandTime_;
-        if (elapsed < std::chrono::seconds(1))
-            return true;
-        // Now return busy until the IRShutter Status Bit is True
-        bool open;
-        int ret = StatusBit(3, open);
-        if (ret != 0)
-            return false;
-        return !open;
-    }
-    else if (lastCommand_ == "IRSHUT 0")
-    {
-        // From the manual: "it is normal for the system to return 1 for approximately 1 second
-        // after issuing the IRSHUTter 0 command."
-        std::chrono::duration elapsed = std::chrono::steady_clock::now() - lastCommandTime_;
-        if (elapsed < std::chrono::seconds(1))
-            return true;
-        // Now return busy until the IRShutter Status Bit is False
-        bool open;
-        int ret = StatusBit(3, open);
-        if (ret != 0)
-            return false;
-        return open;
+			// Return busy until the Main Shutter Status Bit is False
+			bool open;
+			int ret = StatusBit(2, open);
+			if (ret != 0)
+				return false;
+			return open;
+		}
+		else if (lastCommand_ == "IRSHUT 1")
+		{
+			// From the manual: "it is normal for the system to return 0 for approximately 1 second
+			// after issuing the IRSHUTter 1 command"
+			std::chrono::duration elapsed = std::chrono::steady_clock::now() - lastCommandTime_;
+			if (elapsed < std::chrono::seconds(1))
+				return true;
+			// Now return busy until the IRShutter Status Bit is True
+			bool open;
+			int ret = StatusBit(3, open);
+			if (ret != 0)
+				return false;
+			return !open;
+		}
+		else if (lastCommand_ == "IRSHUT 0")
+		{
+			// From the manual: "it is normal for the system to return 1 for approximately 1 second
+			// after issuing the IRSHUTter 0 command."
+			std::chrono::duration elapsed = std::chrono::steady_clock::now() - lastCommandTime_;
+			if (elapsed < std::chrono::seconds(1))
+				return true;
+			// Now return busy until the IRShutter Status Bit is False
+			bool open;
+			int ret = StatusBit(3, open);
+			if (ret != 0)
+				return false;
+			return open;
+		}
     }
     return false;
 }
 
-int SpectraPhysicsInsight::DetectInstalledDevices()
+int SpectraPhysicsHub::DetectInstalledDevices()
 {
-    MM::Device *laser = CreateDevice(g_DeviceNameMain);
+    MM::Device *laser = CreateDevice(g_DeviceNameShutter);
     if (laser)
         AddInstalledDevice(laser);
 
     // TODO: Is there a way to detect whether the 1040nm option is installed?
-    MM::Device *laser1040 = CreateDevice(g_DeviceName1040);
-    if (laser1040)
-        AddInstalledDevice(laser1040);
+    if (model_ == INSIGHT) {
+        MM::Device* laser1040 = CreateDevice(g_DeviceNameInsight1040);
+        if (laser1040)
+            AddInstalledDevice(laser1040);
+    }
     return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnPort(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnPort(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -465,7 +488,7 @@ int SpectraPhysicsInsight::OnPort(MM::PropertyBase * pProp, MM::ActionType eAct)
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnWatchdog(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnWatchdog(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -479,7 +502,7 @@ int SpectraPhysicsInsight::OnWatchdog(MM::PropertyBase * pProp, MM::ActionType e
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnWarmup(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnWarmup(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -492,7 +515,7 @@ int SpectraPhysicsInsight::OnWarmup(MM::PropertyBase * pProp, MM::ActionType eAc
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnHumidity(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnHumidity(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -505,7 +528,7 @@ int SpectraPhysicsInsight::OnHumidity(MM::PropertyBase * pProp, MM::ActionType e
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnDiode1Current(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnDiode1Current(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -518,7 +541,7 @@ int SpectraPhysicsInsight::OnDiode1Current(MM::PropertyBase * pProp, MM::ActionT
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnDiode2Current(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnDiode2Current(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -531,7 +554,7 @@ int SpectraPhysicsInsight::OnDiode2Current(MM::PropertyBase * pProp, MM::ActionT
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnDiode1Temp(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnDiode1Temp(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -544,7 +567,7 @@ int SpectraPhysicsInsight::OnDiode1Temp(MM::PropertyBase * pProp, MM::ActionType
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnDiode2Temp(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnDiode2Temp(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -557,7 +580,7 @@ int SpectraPhysicsInsight::OnDiode2Temp(MM::PropertyBase * pProp, MM::ActionType
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnDiode1Hours(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnDiode1Hours(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -570,7 +593,7 @@ int SpectraPhysicsInsight::OnDiode1Hours(MM::PropertyBase * pProp, MM::ActionTyp
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnDiode2Hours(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnDiode2Hours(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -583,7 +606,7 @@ int SpectraPhysicsInsight::OnDiode2Hours(MM::PropertyBase * pProp, MM::ActionTyp
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnPower(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnPower(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -596,7 +619,7 @@ int SpectraPhysicsInsight::OnPower(MM::PropertyBase * pProp, MM::ActionType eAct
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnHistoryBuffer(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnHistoryBuffer(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -612,7 +635,7 @@ int SpectraPhysicsInsight::OnHistoryBuffer(MM::PropertyBase * pProp, MM::ActionT
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnLaserState(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnLaserState(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -651,7 +674,7 @@ int SpectraPhysicsInsight::OnLaserState(MM::PropertyBase * pProp, MM::ActionType
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnEmission(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnEmission(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -665,7 +688,7 @@ int SpectraPhysicsInsight::OnEmission(MM::PropertyBase * pProp, MM::ActionType e
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnPulsing(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnPulsing(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -679,7 +702,7 @@ int SpectraPhysicsInsight::OnPulsing(MM::PropertyBase * pProp, MM::ActionType eA
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnServoOn(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnServoOn(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -693,7 +716,7 @@ int SpectraPhysicsInsight::OnServoOn(MM::PropertyBase * pProp, MM::ActionType eA
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnUserInterlock(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnUserInterlock(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -707,7 +730,7 @@ int SpectraPhysicsInsight::OnUserInterlock(MM::PropertyBase * pProp, MM::ActionT
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnKeyswitchInterlock(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnKeyswitchInterlock(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -721,7 +744,7 @@ int SpectraPhysicsInsight::OnKeyswitchInterlock(MM::PropertyBase * pProp, MM::Ac
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnPowerSupplyInterlock(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnPowerSupplyInterlock(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -735,7 +758,7 @@ int SpectraPhysicsInsight::OnPowerSupplyInterlock(MM::PropertyBase * pProp, MM::
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnInternalInterlock(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnInternalInterlock(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -749,12 +772,18 @@ int SpectraPhysicsInsight::OnInternalInterlock(MM::PropertyBase * pProp, MM::Act
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnWarning(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnWarning(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
         bool isWarning{};
-        int ret = StatusBit(14, isWarning);
+        int ret{};
+        if (model_ == INSIGHT) {
+            ret = StatusBit(14, isWarning);
+        }
+        else if (model_ == MAITAI) {
+            ret = StatusBit(3, isWarning);
+        }
         if (ret != 0) {
             return ret;
         }
@@ -763,12 +792,18 @@ int SpectraPhysicsInsight::OnWarning(MM::PropertyBase * pProp, MM::ActionType eA
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnFault(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnFault(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
         bool isFault{};
-        int ret = StatusBit(15, isFault);
+        int ret{};
+        if (model_ == INSIGHT) {
+            ret = StatusBit(15, isFault);
+        }
+        else if (model_ == MAITAI) {
+            ret = StatusBit(4, isFault);
+        }
         if (ret != 0) {
             return ret;
         }
@@ -777,7 +812,7 @@ int SpectraPhysicsInsight::OnFault(MM::PropertyBase * pProp, MM::ActionType eAct
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::OnPumpLaser(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsHub::OnPumpLaser(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -835,7 +870,7 @@ int SpectraPhysicsInsight::OnPumpLaser(MM::PropertyBase * pProp, MM::ActionType 
 /**
  * This function not only sends the command but also reads back an answer from the device
  */
-int SpectraPhysicsInsight::ExecuteCommand(const std::string& cmd, std::string& answer)
+int SpectraPhysicsHub::ExecuteCommand(const std::string& cmd, std::string& answer)
 {
     std::lock_guard<std::mutex> guard(serialMutex_);
 	int ret = SendCommand(cmd);
@@ -849,7 +884,7 @@ int SpectraPhysicsInsight::ExecuteCommand(const std::string& cmd, std::string& a
 /**
  * This function sends the command to the Spectra InSight
  */
-int SpectraPhysicsInsight::ExecuteCommand(const std::string& cmd)
+int SpectraPhysicsHub::ExecuteCommand(const std::string& cmd)
 {
     std::lock_guard<std::mutex> guard(serialMutex_);
     return SendCommand(cmd);
@@ -859,7 +894,7 @@ int SpectraPhysicsInsight::ExecuteCommand(const std::string& cmd)
  * This function actually the command to the Spectra InSight.
  * It should not be called directly - call ExecuteCommand instead!
  */
-int SpectraPhysicsInsight::SendCommand(const std::string& cmd)
+int SpectraPhysicsHub::SendCommand(const std::string& cmd)
 {
 	// Send command
 	LogMessage("Spectra Insight: Sending command " + cmd, true);
@@ -873,7 +908,7 @@ int SpectraPhysicsInsight::SendCommand(const std::string& cmd)
     return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::StatusBit(unsigned int bitNumber, bool& bit)
+int SpectraPhysicsHub::StatusBit(unsigned int bitNumber, bool& bit)
 {
     // Returns an integer value that corresponds to a 32-bit binary number
     std::string status_int;
@@ -893,7 +928,7 @@ int SpectraPhysicsInsight::StatusBit(unsigned int bitNumber, bool& bit)
     return DEVICE_OK;
 }
 
-int SpectraPhysicsInsight::LaserState(int& state)
+int SpectraPhysicsHub::LaserState(int& state)
 {
     std::string status_int;
     int ret = ExecuteCommand("*STB?", status_int);
@@ -916,22 +951,22 @@ int SpectraPhysicsInsight::LaserState(int& state)
 // MAIN SHUTTER
 ////////////////////////////////////////////////////////////////////////////////////
 
-SpectraPhysicsInsightMain::SpectraPhysicsInsightMain() :
+SpectraPhysicsMain::SpectraPhysicsMain() :
     initialized_(false),
 	parent_(nullptr)
 {
 }
 
-SpectraPhysicsInsightMain::~SpectraPhysicsInsightMain()
+SpectraPhysicsMain::~SpectraPhysicsMain()
 {
     Shutdown();
 }
 
-int SpectraPhysicsInsightMain::Initialize() {
+int SpectraPhysicsMain::Initialize() {
     MM::Hub* hub = GetParentHub();
     if (!hub)
         return ERR_NO_HUB;
-    parent_ = dynamic_cast<SpectraPhysicsInsight*>(hub);
+    parent_ = dynamic_cast<SpectraPhysicsHub*>(hub);
     if (!parent_)
         return ERR_NO_HUB;
 
@@ -944,7 +979,7 @@ int SpectraPhysicsInsightMain::Initialize() {
     ret = parent_->ExecuteCommand("WAV:max?", wave_max_str);
     if (ret != 0)
         return ret;
-	CPropertyAction* pActTargetWavelength = new CPropertyAction(this, &SpectraPhysicsInsightMain::OnTargetWavelength);
+	CPropertyAction* pActTargetWavelength = new CPropertyAction(this, &SpectraPhysicsMain::OnTargetWavelength);
     ret = CreateIntegerProperty("Target Wavelength (nm)", 800, false, pActTargetWavelength);
     if (ret != 0)
         return ret;
@@ -961,13 +996,13 @@ int SpectraPhysicsInsightMain::Initialize() {
         return ret;
 
     // Configure actual wavelength property
-	CPropertyAction* pActActualWavelength = new CPropertyAction(this, &SpectraPhysicsInsightMain::OnActualWavelength);
+	CPropertyAction* pActActualWavelength = new CPropertyAction(this, &SpectraPhysicsMain::OnActualWavelength);
     ret = CreateIntegerProperty("Actual Wavelength (nm)", 800, true, pActActualWavelength);
     if (ret != 0)
         return ret;
 
     // Configure state property
-	CPropertyAction* pActState = new CPropertyAction(this, &SpectraPhysicsInsightMain::OnState);
+	CPropertyAction* pActState = new CPropertyAction(this, &SpectraPhysicsMain::OnState);
     ret = CreateIntegerProperty(MM::g_Keyword_State, 0, false, pActState);
     if (ret != 0)
         return ret;
@@ -982,7 +1017,7 @@ int SpectraPhysicsInsightMain::Initialize() {
     return DEVICE_OK;
 }
 
-int SpectraPhysicsInsightMain::Shutdown()
+int SpectraPhysicsMain::Shutdown()
 {
     if (initialized_)
     {
@@ -997,19 +1032,19 @@ int SpectraPhysicsInsightMain::Shutdown()
     return DEVICE_OK;
 }
 
-void SpectraPhysicsInsightMain::GetName(char* name) const
+void SpectraPhysicsMain::GetName(char* name) const
 {
-    CDeviceUtils::CopyLimitedString(name, g_DeviceNameMain);
+    CDeviceUtils::CopyLimitedString(name, g_DeviceNameShutter);
 }
 
-bool SpectraPhysicsInsightMain::Busy()
+bool SpectraPhysicsMain::Busy()
 {
     // TODO: We could probably be more granular about this.
     return parent_->Busy();
 }
 
 
-int SpectraPhysicsInsightMain::SetOpen(bool open)
+int SpectraPhysicsMain::SetOpen(bool open)
 {
     if (open) {
 		int ret{}, state{};
@@ -1024,18 +1059,18 @@ int SpectraPhysicsInsightMain::SetOpen(bool open)
         return parent_->ExecuteCommand("SHUT 0");
 }
 
-int SpectraPhysicsInsightMain::GetOpen(bool& open)
+int SpectraPhysicsMain::GetOpen(bool& open)
 {
     // Bit 2 identifies the main shutter, 1 means it is open
     return parent_->StatusBit(2, open);
 }
 
-int SpectraPhysicsInsightMain::Fire(double deltaT)
+int SpectraPhysicsMain::Fire(double deltaT)
 {
    return DEVICE_UNSUPPORTED_COMMAND;
 }
 
-int SpectraPhysicsInsightMain::OnTargetWavelength(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsMain::OnTargetWavelength(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -1056,7 +1091,7 @@ int SpectraPhysicsInsightMain::OnTargetWavelength(MM::PropertyBase * pProp, MM::
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsightMain::OnActualWavelength(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsMain::OnActualWavelength(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -1070,7 +1105,7 @@ int SpectraPhysicsInsightMain::OnActualWavelength(MM::PropertyBase * pProp, MM::
 	return DEVICE_OK;
 }
 
-int SpectraPhysicsInsightMain::OnState(MM::PropertyBase * pProp, MM::ActionType eAct)
+int SpectraPhysicsMain::OnState(MM::PropertyBase * pProp, MM::ActionType eAct)
 {
 	if (eAct == MM::BeforeGet)
 	{
@@ -1114,7 +1149,7 @@ int SpectraPhysicsInsight1040::Initialize() {
     MM::Hub* hub = GetParentHub();
     if (!hub)
         return ERR_NO_HUB;
-    parent_ = dynamic_cast<SpectraPhysicsInsight*>(hub);
+    parent_ = dynamic_cast<SpectraPhysicsHub*>(hub);
     if (!parent_)
         return ERR_NO_HUB;
 
@@ -1152,7 +1187,7 @@ int SpectraPhysicsInsight1040::Shutdown()
 
 void SpectraPhysicsInsight1040::GetName(char* name) const
 {
-    CDeviceUtils::CopyLimitedString(name, g_DeviceName1040);
+    CDeviceUtils::CopyLimitedString(name, g_DeviceNameInsight1040);
 }
 
 bool SpectraPhysicsInsight1040::Busy()
@@ -1214,7 +1249,7 @@ int SpectraPhysicsInsight1040::OnState(MM::PropertyBase * pProp, MM::ActionType 
 // WATCHDOG THREAD
 ////////////////////////////////////////////////////////////////////////////////////
 
-WatchdogThread::WatchdogThread(SpectraPhysicsInsight& device) :
+WatchdogThread::WatchdogThread(SpectraPhysicsHub& device) :
     device_(device),
     stop_(false),
     interval_(std::chrono::seconds(1))

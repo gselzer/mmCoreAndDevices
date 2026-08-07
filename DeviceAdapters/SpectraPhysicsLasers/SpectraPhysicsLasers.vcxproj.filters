@@ -15,12 +15,12 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="SpectraPhysicsInsightDS.cpp">
+    <ClCompile Include="SpectraPhysicsLasers.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="SpectraPhysicsInsightDS.h">
+    <ClInclude Include="SpectraPhysicsLasers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

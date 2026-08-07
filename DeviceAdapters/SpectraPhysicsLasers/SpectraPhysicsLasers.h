@@ -32,32 +32,37 @@
 #define ERR_NO_HUB				        10005
 
 // Forward declaration
-class SpectraPhysicsInsight;
+class SpectraPhysicsHub;
+
+enum LaserModel {
+	INSIGHT,
+	MAITAI
+};
 
 class WatchdogThread : public MMDeviceThreadBase
 {
 public:
-    WatchdogThread(SpectraPhysicsInsight& device);
+    WatchdogThread(SpectraPhysicsHub& device);
     ~WatchdogThread();
     int svc() override;
     void Start();
     void Stop();
 private:
-    SpectraPhysicsInsight& device_;
+    SpectraPhysicsHub& device_;
     std::mutex stopMutex_;
     std::condition_variable timerCV_;
     bool stop_;
     std::chrono::steady_clock::duration interval_;
 };
 
-class SpectraPhysicsInsight : public HubBase<SpectraPhysicsInsight>
+class SpectraPhysicsHub : public HubBase<SpectraPhysicsHub>
 {
     friend class WatchdogThread;
-    friend class SpectraPhysicsInsightMain;
+    friend class SpectraPhysicsMain;
     friend class SpectraPhysicsInsight1040;
 public:
-	SpectraPhysicsInsight();
-	~SpectraPhysicsInsight();
+	SpectraPhysicsHub();
+	~SpectraPhysicsHub();
 
 	// MMDevice API
 	int Initialize();
@@ -68,6 +73,17 @@ public:
 	// Hub API
 	int DetectInstalledDevices();
 
+private:
+	// Device state
+	bool initialized_;
+	LaserModel model_;
+	std::string port_;
+	std::string lastCommand_;
+	std::string onClose_;
+	std::chrono::steady_clock::time_point lastCommandTime_;
+	std::mutex serialMutex_;
+	WatchdogThread watchdogThread_;
+	
 	// Pre-Init Actions
 	int OnPort(MM::PropertyBase * pProp, MM::ActionType eAct);
 	// Actions
@@ -95,16 +111,7 @@ public:
 	int OnWarning(MM::PropertyBase* pProp, MM::ActionType eAct);
 	int OnFault(MM::PropertyBase* pProp, MM::ActionType eAct);
 
-private:
-	// Device state
-	bool initialized_;
-	std::string port_;
-	std::string lastCommand_;
-	std::string onClose_;
-	std::chrono::steady_clock::time_point lastCommandTime_;
-	std::mutex serialMutex_;
-	WatchdogThread watchdogThread_;
-
+	// Private Helpers
 	int ExecuteCommand(const std::string& cmd);
 	int ExecuteCommand(const std::string& cmd, std::string& answer);
 	int SendCommand(const std::string& cmd);
@@ -112,11 +119,11 @@ private:
 	int LaserState(int& state);
 };
 
-class SpectraPhysicsInsightMain : public CShutterBase<SpectraPhysicsInsightMain>
+class SpectraPhysicsMain : public CShutterBase<SpectraPhysicsMain>
 {
 public:
-    SpectraPhysicsInsightMain();
-    ~SpectraPhysicsInsightMain();
+    SpectraPhysicsMain();
+    ~SpectraPhysicsMain();
 
     // MMDevice API
     int Initialize();
@@ -136,7 +143,7 @@ public:
 private:
 	// Device state
 	bool initialized_;
-	SpectraPhysicsInsight* parent_;
+	SpectraPhysicsHub* parent_;
 };
 
 class SpectraPhysicsInsight1040 : public CShutterBase<SpectraPhysicsInsight1040>
@@ -161,5 +168,5 @@ public:
 private:
 	// Device state
 	bool initialized_;
-	SpectraPhysicsInsight* parent_;
+	SpectraPhysicsHub* parent_;
 };
