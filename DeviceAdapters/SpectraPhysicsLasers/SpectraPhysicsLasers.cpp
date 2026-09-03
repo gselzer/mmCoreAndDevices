@@ -111,13 +111,15 @@ int SpectraPhysicsHub::Initialize()
     ret = ExecuteCommand("*IDN?", id);
     if (ret != 0)
         return ret;
-    if (id.rfind("Spectra-Physics, InSight", 0) == 0) {
+    // NOTE: the "Spectra Physics"/"Spectra-Physics" vendor prefix varies (space vs. hyphen,
+    // comma vs. comma-space) across models and firmware versions, so match on the model name only.
+    if (id.find("InSight") != std::string::npos) {
         // TODO: If we want to support DeepSee commands, we could enable them iff "Insight DeepSee" is
         // present in this string.
         LogMessage("Spectra Insight: Controlling device with id \"" + id + "\"");
         model_ = INSIGHT;
     }
-    else if (id.rfind("Spectra-Physics,MaiTai", 0) == 0) {
+    else if (id.find("MaiTai") != std::string::npos) {
         // TODO: MaiTai's id string doesn't differ for DeepSee, according to the manuals...
         LogMessage("Spectra MaiTai: Controlling device with id \"" + id + "\"");
         model_ = MAITAI;
