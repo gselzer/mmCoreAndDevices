@@ -79,6 +79,7 @@ SpectraPhysicsHub::SpectraPhysicsHub() :
     SetErrorText(ERR_PUMP_LASER_NOT_WARM, "Cannot turn on the pump laser before it's warmed up");
     SetErrorText(ERR_WAVELENGTH_CHANGING, "Cannot turn on the pump laser before the wavelength is stable");
     SetErrorText(ERR_NO_HUB, "Cannot obtain the SpectraPhysics MMCore Hub device");
+    SetErrorText(ERR_INVALID_MODEL, "This Spectra-Physics Laser cannot perform the requested functionality");
 
     // COM port property
 	CPropertyAction* pActPort = new CPropertyAction (this, &SpectraPhysicsHub::OnPort);
@@ -846,16 +847,16 @@ int SpectraPhysicsHub::OnPumpLaser(MM::PropertyBase * pProp, MM::ActionType eAct
             }
 			if (warmupPct < 100)
 				return ERR_PUMP_LASER_NOT_WARM;
-            // Also check the laser state for value 25, indicating
+            // On the InSight, we can also check the laser state for value 25, indicating
             // "READY to turn on (i.e. the laser is fully warmed up".
-            //
-            // NOTE: This check may be redundant...
-            int state{};
-            ret = LaserState(state);
-            if (ret != 0)
-                return ret;
-            if (state != 25)
-                return ERR_WAVELENGTH_CHANGING;
+            if (model_ == INSIGHT) {
+                int state{};
+                ret = LaserState(state);
+                if (ret != 0)
+                    return ret;
+                if (state != 25)
+                    return ERR_WAVELENGTH_CHANGING;
+            }
             // Passed checks, turning on
             return ExecuteCommand("ON");
 		}
@@ -931,6 +932,10 @@ int SpectraPhysicsHub::StatusBit(unsigned int bitNumber, bool& bit)
 
 int SpectraPhysicsHub::LaserState(int& state)
 {
+    if (model_ != INSIGHT) {
+        // Only the InSight has the Laser State field...
+        return ERR_INVALID_MODEL;
+    }
     std::string status_int;
     int ret = ExecuteCommand("*STB?", status_int);
     if (ret != 0)
@@ -1049,12 +1054,14 @@ bool SpectraPhysicsMain::Busy()
 int SpectraPhysicsMain::SetOpen(bool open)
 {
     if (open) {
-		int ret{}, state{};
-		ret = parent_->LaserState(state);
-		if (ret != 0)
-            return ret;
-		if (state != 50)
-			return ERR_PUMP_LASER_TURNING_ON;
+        if (parent_->model_ == INSIGHT) {
+			int ret{}, state{};
+			ret = parent_->LaserState(state);
+			if (ret != 0)
+				return ret;
+			if (state != 50)
+				return ERR_PUMP_LASER_TURNING_ON;
+        }
         return parent_->ExecuteCommand("SHUT 1");
     }
     else

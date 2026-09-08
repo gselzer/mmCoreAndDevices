@@ -30,6 +30,7 @@
 #define ERR_WAVELENGTH_CHANGING         10003
 #define ERR_PUMP_LASER_TURNING_ON       10004
 #define ERR_NO_HUB				        10005
+#define ERR_INVALID_MODEL               10006
 
 // Forward declaration
 class SpectraPhysicsHub;
