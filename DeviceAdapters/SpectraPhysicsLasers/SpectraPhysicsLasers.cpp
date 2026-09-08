@@ -78,7 +78,6 @@ SpectraPhysicsHub::SpectraPhysicsHub() :
     SetErrorText(ERR_PORT_CHANGE_FORBIDDEN, "Cannot change port after initialization");
     SetErrorText(ERR_PUMP_LASER_NOT_WARM, "Cannot turn on the pump laser before it's warmed up");
     SetErrorText(ERR_WAVELENGTH_CHANGING, "Cannot turn on the pump laser before the wavelength is stable");
-    SetErrorText(ERR_PUMP_LASER_TURNING_ON, "Cannot open the shutter before the laser is on");
     SetErrorText(ERR_NO_HUB, "Cannot obtain the SpectraPhysics MMCore Hub device");
 
     // COM port property
@@ -957,6 +956,7 @@ SpectraPhysicsMain::SpectraPhysicsMain() :
     initialized_(false),
 	parent_(nullptr)
 {
+    SetErrorText(ERR_PUMP_LASER_TURNING_ON, "Cannot open the shutter before the laser is on");
 }
 
 SpectraPhysicsMain::~SpectraPhysicsMain()
@@ -1140,6 +1140,7 @@ SpectraPhysicsInsight1040::SpectraPhysicsInsight1040() :
     initialized_(false),
 	parent_(nullptr)
 {
+    SetErrorText(ERR_PUMP_LASER_TURNING_ON, "Cannot open the shutter before the laser is on");
 }
 
 SpectraPhysicsInsight1040::~SpectraPhysicsInsight1040()
