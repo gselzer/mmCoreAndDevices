@@ -188,12 +188,6 @@ int SpectraPhysicsHub::Initialize()
     if (ret != 0)
         return ret;
 
-    // Configure laser state property (read-only)
-	CPropertyAction* pActLaserState = new CPropertyAction(this, &SpectraPhysicsHub::OnLaserState);
-    ret = CreateStringProperty("Laser State", "", true, pActLaserState);
-    if (ret != 0)
-        return ret;
-
     // Configure history buffer property (read-only)
 	CPropertyAction* pActHistoryBuffer = new CPropertyAction(this, &SpectraPhysicsHub::OnHistoryBuffer);
     ret = CreateStringProperty("Status Code Buffer", "", true, pActHistoryBuffer);
@@ -331,6 +325,13 @@ int SpectraPhysicsHub::Initialize()
 		if (ret != 0)
 			return ret;
 		ret = AddAllowedValue("Internal Interlock", "1");
+		if (ret != 0)
+			return ret;
+
+		// Configure laser state property (read-only).
+        // Only the InSight's *STB? response carries the 7-bit Laser State field
+		CPropertyAction* pActLaserState = new CPropertyAction(this, &SpectraPhysicsHub::OnLaserState);
+		ret = CreateStringProperty("Laser State", "", true, pActLaserState);
 		if (ret != 0)
 			return ret;
     }
@@ -1306,10 +1307,10 @@ int WatchdogThread::svc() {
                 break;
             }
         }
-        // Just need to do something that sends a command
+        // Send a benign serial command to the laser.
 		device_.LogMessage("Spectra Insight Watchdog Thread: Pinging laser", true);
-		int state;
-		device_.LaserState(state);
+		std::string status;
+		device_.ExecuteCommand("*STB?", status);
     }
 
     return 0;
